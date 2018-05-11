@@ -44,7 +44,7 @@ compileJava   {
     targetCompatibility = '1.8'
 }
 
-version = "1.0.0-beta.1"
+version = "1.0.0"
 
 jar {
     manifest {
