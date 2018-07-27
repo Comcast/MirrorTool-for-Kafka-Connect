@@ -32,7 +32,6 @@ import org.powermock.core.classloader.annotations.PowerMockIgnore;
 import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.modules.junit4.PowerMockRunner;
 
-import java.sql.Time;
 import java.util.*;
 
 import static junit.framework.TestCase.assertTrue;
@@ -57,14 +56,15 @@ public class KafkaSourceTaskTest {
     private Properties props;
     private KafkaSourceConnectorConfig config;
 
-    private String MAX_SHUTDOWN_WAIT_MS_CONFIG = "5";
-    private String POLL_TIMEOUT_MS_CONFIG = "5";
+    private String MAX_SHUTDOWN_WAIT_MS_CONFIG = "2000";
+    private String POLL_LOOP_TIMEOUT_MS_CONFIG = "5";
     private String DESTINATION_TOPIC_PREFIX_CONFIG = "test.destination";
     private String INCLUDE_MESSAGE_HEADERS_CONFIG = "false";
     private String CONSUMER_AUTO_OFFSET_RESET_CONFIG = "0";
-    private String CONSUMER_BOOTSTRAP_SERVERS_CONFIG = "localhost:6000";
+    private String SOURCE_BOOTSTRAP_SERVERS_CONFIG = "localhost:6000";
     private String TASK_LEADER_TOPIC_PARTITION_CONFIG = "0:test.topic:1";
     private String AUTO_OFFSET_RESET_CONFIG = "latest";
+    private String SOURCE_TOPICS_WHITELIST_CONFIG = "test*";
 
 
     private String FIRST_TOPIC = "test.topic";
@@ -83,12 +83,13 @@ public class KafkaSourceTaskTest {
     public void setup() {
 
         opts = new HashMap<>();
+        opts.put(KafkaSourceConnectorConfig.SOURCE_TOPIC_WHITELIST_CONFIG, SOURCE_TOPICS_WHITELIST_CONFIG);
         opts.put(KafkaSourceConnectorConfig.MAX_SHUTDOWN_WAIT_MS_CONFIG, MAX_SHUTDOWN_WAIT_MS_CONFIG);
-        opts.put(KafkaSourceConnectorConfig.POLL_TIMEOUT_MS_CONFIG, POLL_TIMEOUT_MS_CONFIG);
+        opts.put(KafkaSourceConnectorConfig.POLL_LOOP_TIMEOUT_MS_CONFIG, POLL_LOOP_TIMEOUT_MS_CONFIG);
         opts.put(KafkaSourceConnectorConfig.DESTINATION_TOPIC_PREFIX_CONFIG, DESTINATION_TOPIC_PREFIX_CONFIG);
         opts.put(KafkaSourceConnectorConfig.INCLUDE_MESSAGE_HEADERS_CONFIG, INCLUDE_MESSAGE_HEADERS_CONFIG);
         opts.put(KafkaSourceConnectorConfig.CONSUMER_AUTO_OFFSET_RESET_CONFIG, CONSUMER_AUTO_OFFSET_RESET_CONFIG);
-        opts.put(KafkaSourceConnectorConfig.CONSUMER_BOOTSTRAP_SERVERS_CONFIG, CONSUMER_BOOTSTRAP_SERVERS_CONFIG);
+        opts.put(KafkaSourceConnectorConfig.SOURCE_BOOTSTRAP_SERVERS_CONFIG, SOURCE_BOOTSTRAP_SERVERS_CONFIG);
         opts.put(KafkaSourceConnectorConfig.TASK_LEADER_TOPIC_PARTITION_CONFIG, TASK_LEADER_TOPIC_PARTITION_CONFIG);
         opts.put(KafkaSourceConnectorConfig.CONSUMER_AUTO_OFFSET_RESET_CONFIG, AUTO_OFFSET_RESET_CONFIG);
 
@@ -168,7 +169,7 @@ public class KafkaSourceTaskTest {
 
         EasyMock.expect(context.offsetStorageReader()).andReturn(offsetStorageReader);
         EasyMock.expect(offsetStorageReader.offsets(EasyMock.<List<Map<String, String>>>anyObject())).andReturn(new HashMap<>());
-        PowerMock.expectNew(KafkaConsumer.class, new Class[]{Properties.class}, props).andReturn(consumer);
+        PowerMock.expectNew(KafkaConsumer.class, new Class[]{Properties.class}, config.getKafkaConsumerProperties()).andReturn(consumer);
         EasyMock.expect(consumer.endOffsets(topicPartitions)).andReturn(endOffsets);
         consumer.assign(topicPartitions);
         EasyMock.expectLastCall();
@@ -185,7 +186,7 @@ public class KafkaSourceTaskTest {
 
         EasyMock.expect(context.offsetStorageReader()).andReturn(offsetStorageReader);
         EasyMock.expect(offsetStorageReader.offsets(EasyMock.<List<Map<String, String>>>anyObject())).andReturn(new HashMap<>());
-        PowerMock.expectNew(KafkaConsumer.class, new Class[]{Properties.class}, props).andReturn(consumer);
+        PowerMock.expectNew(KafkaConsumer.class, new Class[]{Properties.class}, config.getKafkaConsumerProperties()).andReturn(consumer);
         EasyMock.expect(consumer.endOffsets(topicPartitions)).andReturn(endOffsets);
         consumer.assign(topicPartitions);
         EasyMock.expectLastCall();
@@ -212,7 +213,7 @@ public class KafkaSourceTaskTest {
 
         EasyMock.expect(context.offsetStorageReader()).andReturn(offsetStorageReader);
         EasyMock.expect(offsetStorageReader.offsets(EasyMock.<List<Map<String, String>>>anyObject())).andReturn(new HashMap<>());
-        PowerMock.expectNew(KafkaConsumer.class, new Class[]{Properties.class}, props).andReturn(consumer);
+        PowerMock.expectNew(KafkaConsumer.class, new Class[]{Properties.class}, config.getKafkaConsumerProperties()).andReturn(consumer);
         EasyMock.expect(consumer.beginningOffsets(topicPartitions)).andReturn(endOffsets);
         consumer.assign(topicPartitions);
         EasyMock.expectLastCall();
@@ -237,7 +238,7 @@ public class KafkaSourceTaskTest {
 
         EasyMock.expect(context.offsetStorageReader()).andReturn(offsetStorageReader);
         EasyMock.expect(offsetStorageReader.offsets(EasyMock.<List<Map<String, String>>>anyObject())).andReturn(storedOffsets);
-        PowerMock.expectNew(KafkaConsumer.class, new Class[]{Properties.class}, props).andReturn(consumer);
+        PowerMock.expectNew(KafkaConsumer.class, new Class[]{Properties.class}, config.getKafkaConsumerProperties()).andReturn(consumer);
         consumer.assign(topicPartitions);
         EasyMock.expectLastCall();
         consumer.seek(firstTopicPartition, FIRST_OFFSET);
@@ -269,7 +270,7 @@ public class KafkaSourceTaskTest {
 
         EasyMock.expect(context.offsetStorageReader()).andReturn(offsetStorageReader);
         EasyMock.expect(offsetStorageReader.offsets(EasyMock.<List<Map<String, String>>>anyObject())).andReturn(storedOffsets);
-        PowerMock.expectNew(KafkaConsumer.class, new Class[]{Properties.class}, props).andReturn(consumer);
+        PowerMock.expectNew(KafkaConsumer.class, new Class[]{Properties.class}, config.getKafkaConsumerProperties()).andReturn(consumer);
         EasyMock.expect(consumer.endOffsets(Collections.singletonList(firstTopicPartition))).andReturn(endOffsets);
         consumer.assign(topicPartitions);
         EasyMock.expectLastCall();
@@ -338,7 +339,7 @@ public class KafkaSourceTaskTest {
 
         EasyMock.expect(context.offsetStorageReader()).andReturn(offsetStorageReader);
         EasyMock.expect(offsetStorageReader.offsets(EasyMock.<List<Map<String, String>>>anyObject())).andReturn(new HashMap<>());
-        PowerMock.expectNew(KafkaConsumer.class, new Class[]{Properties.class}, props).andReturn(consumer);
+        PowerMock.expectNew(KafkaConsumer.class, new Class[]{Properties.class}, config.getKafkaConsumerProperties()).andReturn(consumer);
         EasyMock.expect(consumer.endOffsets(topicPartitions)).andReturn(endOffsets);
         consumer.assign(topicPartitions);
         EasyMock.expectLastCall();

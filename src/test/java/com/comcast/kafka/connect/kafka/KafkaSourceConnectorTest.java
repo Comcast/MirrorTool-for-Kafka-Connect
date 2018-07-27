@@ -47,9 +47,9 @@ public class KafkaSourceConnectorTest extends EasyMockSupport {
     private Map<String, String> sourceProperties;
 
     private static final String SOURCE_TOPICS_VALUE = "test.topic";
-    private static final String CONSUMER_BOOTSTRAP_SERVERS_VALUE = "localhost:6000";
-    private static final String POLL_TIMEOUT_MS_VALUE = "2000";
-    private static final String PARTITION_MONITOR_TOPIC_LIST_TIMEOUT_MS_VALUE = "5000";
+    private static final String SOURCE_BOOTSTRAP_SERVERS_CONFIG = "localhost:6000";
+    private static final String POLL_LOOP_TIMEOUT_MS_VALUE = "2000";
+    private static final String TOPIC_LIST_TIMEOUT_MS_VALUE = "5000";
 
     @Before
     public void setUp() throws Exception {
@@ -60,10 +60,10 @@ public class KafkaSourceConnectorTest extends EasyMockSupport {
 
         // Default test settings
         sourceProperties = new HashMap<>();
-        sourceProperties.put(KafkaSourceConnectorConfig.SOURCE_TOPICS_CONFIG, SOURCE_TOPICS_VALUE);
-        sourceProperties.put(KafkaSourceConnectorConfig.CONSUMER_BOOTSTRAP_SERVERS_CONFIG, CONSUMER_BOOTSTRAP_SERVERS_VALUE);
-        sourceProperties.put(KafkaSourceConnectorConfig.POLL_TIMEOUT_MS_CONFIG, POLL_TIMEOUT_MS_VALUE);
-        sourceProperties.put(KafkaSourceConnectorConfig.PARTITION_MONITOR_TOPIC_LIST_TIMEOUT_MS_CONFIG, PARTITION_MONITOR_TOPIC_LIST_TIMEOUT_MS_VALUE);
+        sourceProperties.put(KafkaSourceConnectorConfig.SOURCE_TOPIC_WHITELIST_CONFIG, SOURCE_TOPICS_VALUE);
+        sourceProperties.put(KafkaSourceConnectorConfig.SOURCE_BOOTSTRAP_SERVERS_CONFIG, SOURCE_BOOTSTRAP_SERVERS_CONFIG);
+        sourceProperties.put(KafkaSourceConnectorConfig.POLL_LOOP_TIMEOUT_MS_CONFIG, POLL_LOOP_TIMEOUT_MS_VALUE);
+        sourceProperties.put(KafkaSourceConnectorConfig.TOPIC_LIST_TIMEOUT_MS_CONFIG, TOPIC_LIST_TIMEOUT_MS_VALUE);
 
         // Default leader topic partitions to return (just one)
         stubLeaderTopicPartitions = new HashSet<>();
@@ -81,7 +81,7 @@ public class KafkaSourceConnectorTest extends EasyMockSupport {
         suppress(method(PartitionMonitor.class, "start"));
         PowerMock.replayAll();
 
-        sourceProperties.remove(KafkaSourceConnectorConfig.CONSUMER_BOOTSTRAP_SERVERS_CONFIG);
+        sourceProperties.remove(KafkaSourceConnectorConfig.SOURCE_BOOTSTRAP_SERVERS_CONFIG);
         connector.start(sourceProperties);
 
         PowerMock.verifyAll();
@@ -92,42 +92,18 @@ public class KafkaSourceConnectorTest extends EasyMockSupport {
         suppress(method(PartitionMonitor.class, "start"));
         PowerMock.replayAll();
 
-        sourceProperties.put(KafkaSourceConnectorConfig.CONSUMER_BOOTSTRAP_SERVERS_CONFIG, "");
+        sourceProperties.put(KafkaSourceConnectorConfig.SOURCE_BOOTSTRAP_SERVERS_CONFIG, "");
         connector.start(sourceProperties);
 
         PowerMock.verifyAll();
     }
 
     @Test(expected = ConfigException.class)
-    public void testStartTopicListAndRegexSet() {
-        suppress(method(PartitionMonitor.class, "start"));
-        PowerMock.replayAll();
-
-        sourceProperties.put(KafkaSourceConnectorConfig.SOURCE_TOPICS_CONFIG, "a.test.topic");
-        sourceProperties.put(KafkaSourceConnectorConfig.SOURCE_TOPICS_REGEX_CONFIG, "*");
-        connector.start(sourceProperties);
-
-        PowerMock.verifyAll();
-    }
-
-    @Test(expected = ConfigException.class)
-    public void testStartTopicListAndRegexMissing() {
+    public void testStartTopicWhitelistMissing() {
         suppress(method(PartitionMonitor.class, "start"));
         replayAll();
 
-        sourceProperties.remove(KafkaSourceConnectorConfig.SOURCE_TOPICS_CONFIG);
-        connector.start(sourceProperties);
-
-        PowerMock.verifyAll();
-    }
-
-    @Test(expected = ConfigException.class)
-    public void testStartTopicListAndRegexBlank() {
-        suppress(method(PartitionMonitor.class, "start"));
-        PowerMock.replayAll();
-
-        sourceProperties.put(KafkaSourceConnectorConfig.SOURCE_TOPICS_CONFIG, "");
-        sourceProperties.put(KafkaSourceConnectorConfig.SOURCE_TOPICS_REGEX_CONFIG, "");
+        sourceProperties.remove(KafkaSourceConnectorConfig.SOURCE_TOPIC_WHITELIST_CONFIG);
         connector.start(sourceProperties);
 
         PowerMock.verifyAll();
@@ -137,14 +113,9 @@ public class KafkaSourceConnectorTest extends EasyMockSupport {
     public void testStartCorrectConfig() throws Exception {
         PowerMock.expectNew(
                 PartitionMonitor.class,
-                new Class<?>[] { ConnectorContext.class, Properties.class, List.class, boolean.class, int.class, int.class, int.class },
+                new Class<?>[] { ConnectorContext.class, KafkaSourceConnectorConfig.class },
                 EasyMock.anyObject(ConnectorContext.class),
-                EasyMock.anyObject(Properties.class),
-                EasyMock.anyObject(List.class),
-                EasyMock.anyBoolean(),
-                EasyMock.anyInt(),
-                EasyMock.anyInt(),
-                EasyMock.anyInt()
+                EasyMock.anyObject(KafkaSourceConnectorConfig.class)
         ).andStubReturn(partitionMonitorMock);
         partitionMonitorMock.start();
         PowerMock.expectLastCall().andVoid();
@@ -159,14 +130,9 @@ public class KafkaSourceConnectorTest extends EasyMockSupport {
     public void testTaskConfigsReturns1TaskOnOneTopicPartition() throws Exception {
         PowerMock.expectNew(
                 PartitionMonitor.class,
-                new Class<?>[] { ConnectorContext.class, Properties.class, List.class, boolean.class, int.class, int.class, int.class },
+                new Class<?>[] { ConnectorContext.class, KafkaSourceConnectorConfig.class },
                 EasyMock.anyObject(ConnectorContext.class),
-                EasyMock.anyObject(Properties.class),
-                EasyMock.anyObject(List.class),
-                EasyMock.anyBoolean(),
-                EasyMock.anyInt(),
-                EasyMock.anyInt(),
-                EasyMock.anyInt()
+                EasyMock.anyObject(KafkaSourceConnectorConfig.class)
         ).andStubReturn(partitionMonitorMock);
         partitionMonitorMock.start();
         PowerMock.expectLastCall().andVoid();
@@ -180,9 +146,9 @@ public class KafkaSourceConnectorTest extends EasyMockSupport {
         assertEquals("0:test.topic:0",
                 taskConfigs.get(0).get("task.leader.topic.partitions"));
         assertEquals(SOURCE_TOPICS_VALUE,
-                taskConfigs.get(0).get(KafkaSourceConnectorConfig.SOURCE_TOPICS_CONFIG));
-        assertEquals(CONSUMER_BOOTSTRAP_SERVERS_VALUE,
-                taskConfigs.get(0).get(KafkaSourceConnectorConfig.CONSUMER_BOOTSTRAP_SERVERS_CONFIG));
+                taskConfigs.get(0).get(KafkaSourceConnectorConfig.SOURCE_TOPIC_WHITELIST_CONFIG));
+        assertEquals(SOURCE_BOOTSTRAP_SERVERS_CONFIG,
+                taskConfigs.get(0).get(KafkaSourceConnectorConfig.SOURCE_BOOTSTRAP_SERVERS_CONFIG));
 
         verifyAll();
     }
@@ -198,15 +164,11 @@ public class KafkaSourceConnectorTest extends EasyMockSupport {
 
         PowerMock.expectNew(
                 PartitionMonitor.class,
-                new Class<?>[] { ConnectorContext.class, Properties.class, List.class, boolean.class, int.class, int.class, int.class },
+                new Class<?>[] { ConnectorContext.class, KafkaSourceConnectorConfig.class },
                 EasyMock.anyObject(ConnectorContext.class),
-                EasyMock.anyObject(Properties.class),
-                EasyMock.anyObject(List.class),
-                EasyMock.anyBoolean(),
-                EasyMock.anyInt(),
-                EasyMock.anyInt(),
-                EasyMock.anyInt()
+                EasyMock.anyObject(KafkaSourceConnectorConfig.class)
         ).andStubReturn(partitionMonitorMock);
+
         partitionMonitorMock.start();
         PowerMock.expectLastCall().andVoid();
         EasyMock.expect(partitionMonitorMock.getCurrentLeaderTopicPartitions()).andReturn(stubLeaderTopicPartitions);
@@ -231,15 +193,11 @@ public class KafkaSourceConnectorTest extends EasyMockSupport {
 
         PowerMock.expectNew(
                 PartitionMonitor.class,
-                new Class<?>[] { ConnectorContext.class, Properties.class, List.class, boolean.class, int.class, int.class, int.class },
+                new Class<?>[] { ConnectorContext.class, KafkaSourceConnectorConfig.class },
                 EasyMock.anyObject(ConnectorContext.class),
-                EasyMock.anyObject(Properties.class),
-                EasyMock.anyObject(List.class),
-                EasyMock.anyBoolean(),
-                EasyMock.anyInt(),
-                EasyMock.anyInt(),
-                EasyMock.anyInt()
+                EasyMock.anyObject(KafkaSourceConnectorConfig.class)
         ).andStubReturn(partitionMonitorMock);
+
         partitionMonitorMock.start();
         PowerMock.expectLastCall().andVoid();
         EasyMock.expect(partitionMonitorMock.getCurrentLeaderTopicPartitions()).andReturn(stubLeaderTopicPartitions);

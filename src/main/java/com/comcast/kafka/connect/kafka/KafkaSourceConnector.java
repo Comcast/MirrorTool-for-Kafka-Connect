@@ -44,34 +44,11 @@ public class KafkaSourceConnector extends SourceConnector {
     public void start(Map<String, String> config) throws ConfigException {
         LOG.info("Connector: start()");
         connectorConfig = new KafkaSourceConnectorConfig(config);
-        if (connectorConfig.getList(KafkaSourceConnectorConfig.CONSUMER_BOOTSTRAP_SERVERS_CONFIG).isEmpty()) {
-            throw new ConfigException("At least one bootstrap server must be configured in " + KafkaSourceConnectorConfig.CONSUMER_BOOTSTRAP_SERVERS_CONFIG);
+        if (connectorConfig.getList(KafkaSourceConnectorConfig.SOURCE_BOOTSTRAP_SERVERS_CONFIG).isEmpty()) {
+            throw new ConfigException("At least one bootstrap server must be configured in " + KafkaSourceConnectorConfig.SOURCE_BOOTSTRAP_SERVERS_CONFIG);
         }
-        // Topic config needs to be validated first
-        List<String> topicsList = connectorConfig.getList(KafkaSourceConnectorConfig.SOURCE_TOPICS_CONFIG);
-        boolean topicsListPresent = !topicsList.isEmpty();
-        String topicsRegexStr = connectorConfig.getString(KafkaSourceConnectorConfig.SOURCE_TOPICS_REGEX_CONFIG);
-        boolean topicsRegexStrPresent = !topicsRegexStr.trim().isEmpty();
-        if (topicsListPresent && topicsRegexStrPresent) {
-            throw new ConfigException(KafkaSourceConnectorConfig.SOURCE_TOPICS_CONFIG + " and " + KafkaSourceConnectorConfig.SOURCE_TOPICS_REGEX_CONFIG +
-                    " are mutually exclusive options, but both are set.");
-        }
-        if (!topicsListPresent && !topicsRegexStrPresent) {
-            throw new ConfigException("Must configure one of " + KafkaSourceConnectorConfig.SOURCE_TOPICS_CONFIG + " or " + KafkaSourceConnectorConfig.SOURCE_TOPICS_REGEX_CONFIG);
-        }
-        // Other config
-        int shutdownTimeout = connectorConfig.getInt(KafkaSourceConnectorConfig.MAX_SHUTDOWN_WAIT_MS_CONFIG);
-        int topicRequestTimeoutMs = connectorConfig.getInt(KafkaSourceConnectorConfig.PARTITION_MONITOR_TOPIC_LIST_TIMEOUT_MS_CONFIG);
-        boolean reconfigureTasksOnLeaderChange = connectorConfig.getBoolean(KafkaSourceConnectorConfig.PARTITION_MONITOR_RECONFIGURE_TASKS_ON_LEADER_CHANGE_CONFIG);
-        int pollIntervalMs = connectorConfig.getInt(KafkaSourceConnectorConfig.PARTITION_MONITOR_POLL_INTERVAL_MS_CONFIG);
-        Properties adminClientConfig = new Properties();
-        adminClientConfig.putAll(connectorConfig.allWithPrefix(KafkaSourceConnectorConfig.CONSUMER_PREFIX));
         LOG.info("Starting Partition Monitor to monitor source kafka cluster partitions");
-        if (topicsListPresent) {
-            partitionMonitor = new PartitionMonitor(context, adminClientConfig, topicsList, reconfigureTasksOnLeaderChange, pollIntervalMs, topicRequestTimeoutMs, shutdownTimeout);
-        } else {
-            partitionMonitor = new PartitionMonitor(context, adminClientConfig, topicsRegexStr, reconfigureTasksOnLeaderChange, pollIntervalMs, topicRequestTimeoutMs, shutdownTimeout);
-        }
+        partitionMonitor = new PartitionMonitor(context, connectorConfig);
         partitionMonitor.start();
     }
 
@@ -87,7 +64,7 @@ public class KafkaSourceConnector extends SourceConnector {
         List<String> leaderTopicPartitions = partitionMonitor.getCurrentLeaderTopicPartitions()
             .stream()
             .map(LeaderTopicPartition::toString)
-            .sorted() // Minor task performance/overhead improvement by roughly grouping tasks and leaders
+            .sorted() // Potential task performance/overhead improvement by roughly grouping tasks and leaders
             .collect(Collectors.toList());
         int taskCount = Math.min(maxTasks, leaderTopicPartitions.size());
         if (taskCount < 1) {

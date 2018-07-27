@@ -11,7 +11,6 @@
 package com.comcast.kafka.connect.kafka;
 
 import org.apache.kafka.clients.admin.*;
-import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.connect.connector.ConnectorContext;
 import org.apache.kafka.connect.errors.ConnectException;
@@ -36,8 +35,7 @@ public class PartitionMonitor {
 
     private AtomicBoolean shutdown = new AtomicBoolean(false);
     private AdminClient partitionMonitorClient;
-    private Set<String> topicsWhitelist;
-    private Pattern topicsRegexPattern;
+    private Set<Pattern> topicWhitelistPatterns;
     private volatile Set<LeaderTopicPartition> currentLeaderTopicPartitions = new HashSet<>();
 
     private int maxShutdownWaitMs;
@@ -48,34 +46,16 @@ public class PartitionMonitor {
     private ScheduledExecutorService pollExecutorService;
     private ScheduledFuture<?> pollHandle;
 
-    // Constructor with topics list
-    PartitionMonitor(ConnectorContext connectorContext, Properties adminClientConfig, List<String> topicsList,
-                     boolean reconfigureOnLeaderChange, int pollIntervalMs, int topicListTimeout, int shutdownTimeout)
-            throws ConfigException {
-        this(connectorContext, adminClientConfig, topicsList, null, reconfigureOnLeaderChange, pollIntervalMs, topicListTimeout, shutdownTimeout);
-    }
-
-    // Constructor with topics regex
-    PartitionMonitor(ConnectorContext connectorContext, Properties adminClientConfig, String topicsRegexStr,
-                     boolean reconfigureOnLeaderChange, int pollIntervalMs, int topicListTimeout, int shutdownTimeout)
-            throws ConfigException {
-        this(connectorContext, adminClientConfig, null, topicsRegexStr, reconfigureOnLeaderChange, pollIntervalMs, topicListTimeout, shutdownTimeout);
-    }
-
-
-    PartitionMonitor(ConnectorContext connectorContext, Properties adminClientConfig, List<String> topicsList,
-                     String topicsRegexStr, boolean reconfigureOnLeaderChange, int pollIntervalMs,
-                     int topicListTimeout, int shutdownTimeout) throws ConfigException {
-        if (topicsList != null) {
-            topicsWhitelist = new HashSet<>(topicsList);
-        } else {
-            topicsRegexPattern = Pattern.compile(topicsRegexStr);
-        }
-        reconfigureTasksOnLeaderChange = reconfigureOnLeaderChange;
-        topicPollIntervalMs = pollIntervalMs;
-        maxShutdownWaitMs = shutdownTimeout;
-        topicRequestTimeoutMs = topicListTimeout;
-        partitionMonitorClient = AdminClient.create(adminClientConfig);
+    PartitionMonitor(ConnectorContext connectorContext, KafkaSourceConnectorConfig sourceConnectorConfig) throws ConfigException {
+        topicWhitelistPatterns = sourceConnectorConfig.getList(KafkaSourceConnectorConfig.SOURCE_TOPIC_WHITELIST_CONFIG)
+            .stream()
+            .map(regex -> Pattern.compile(regex))
+            .collect(Collectors.toCollection(HashSet::new));
+        reconfigureTasksOnLeaderChange = sourceConnectorConfig.getBoolean(KafkaSourceConnectorConfig.RECONFIGURE_TASKS_ON_LEADER_CHANGE_CONFIG);
+        topicPollIntervalMs = sourceConnectorConfig.getInt(KafkaSourceConnectorConfig.TOPIC_LIST_POLL_INTERVAL_MS_CONFIG);;
+        maxShutdownWaitMs = sourceConnectorConfig.getInt(KafkaSourceConnectorConfig.MAX_SHUTDOWN_WAIT_MS_CONFIG);;
+        topicRequestTimeoutMs = sourceConnectorConfig.getInt(KafkaSourceConnectorConfig.TOPIC_LIST_TIMEOUT_MS_CONFIG);;
+        partitionMonitorClient = AdminClient.create(sourceConnectorConfig.getAdminClientProperties());
         // Thread to periodically poll the kafka cluster for changes in topics or partititons
         pollThread = new Runnable() {
             @Override
@@ -149,11 +129,7 @@ public class PartitionMonitor {
     }
 
     private boolean matchedTopicFilter(String topic) {
-        if (topicsWhitelist != null) {
-            return topicsWhitelist.contains(topic);
-        } else {
-            return topicsRegexPattern.matcher(topic).matches();
-        }
+        return topicWhitelistPatterns.stream().anyMatch(pattern -> pattern.matcher(topic).matches());
     }
 
     private synchronized void setCurrentLeaderTopicPartitions(Set<LeaderTopicPartition> leaderTopicPartitions) {

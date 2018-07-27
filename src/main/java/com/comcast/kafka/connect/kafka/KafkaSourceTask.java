@@ -57,15 +57,12 @@ public class KafkaSourceTask extends SourceTask {
     // TODO: Maybe synchronize access to this function to ensure that stop() cant be called before the consumer is initialized? (Can stop even be called if start() hasnt returned?)
     public void start(Map<String, String> opts) {
         LOG.info("{}: starting", this);
-        KafkaSourceConnectorConfig config = new KafkaSourceConnectorConfig(opts);
-        maxShutdownWait = config.getInt(KafkaSourceConnectorConfig.MAX_SHUTDOWN_WAIT_MS_CONFIG);
-        pollTimeout = config.getInt(KafkaSourceConnectorConfig.POLL_TIMEOUT_MS_CONFIG);
-        topicPrefix = config.getString(KafkaSourceConnectorConfig.DESTINATION_TOPIC_PREFIX_CONFIG);
-        includeHeaders = config.getBoolean(KafkaSourceConnectorConfig.INCLUDE_MESSAGE_HEADERS_CONFIG);
-        String unknownOffsetResetPosition = config.getString(KafkaSourceConnectorConfig.CONSUMER_AUTO_OFFSET_RESET_CONFIG);
-        // Kafka consumer config
-        Properties props = new Properties();
-        props.putAll(config.allWithPrefix(KafkaSourceConnectorConfig.CONSUMER_PREFIX));
+        KafkaSourceConnectorConfig sourceConnectorConfig = new KafkaSourceConnectorConfig(opts);
+        maxShutdownWait = sourceConnectorConfig.getInt(KafkaSourceConnectorConfig.MAX_SHUTDOWN_WAIT_MS_CONFIG);
+        pollTimeout = sourceConnectorConfig.getInt(KafkaSourceConnectorConfig.POLL_LOOP_TIMEOUT_MS_CONFIG);
+        topicPrefix = sourceConnectorConfig.getString(KafkaSourceConnectorConfig.DESTINATION_TOPIC_PREFIX_CONFIG);
+        includeHeaders = sourceConnectorConfig.getBoolean(KafkaSourceConnectorConfig.INCLUDE_MESSAGE_HEADERS_CONFIG);
+        String unknownOffsetResetPosition = sourceConnectorConfig.getString(KafkaSourceConnectorConfig.CONSUMER_AUTO_OFFSET_RESET_CONFIG);
         // Get the leader topic partitions to work with
         List<LeaderTopicPartition> leaderTopicPartitions = Arrays.asList(opts.get(KafkaSourceConnectorConfig.TASK_LEADER_TOPIC_PARTITION_CONFIG)
             .split(","))
@@ -82,7 +79,7 @@ public class KafkaSourceTask extends SourceTask {
             .filter(e -> e != null && e.getKey() != null && e.getKey().get(TOPIC_PARTITION_KEY) != null && e.getValue() != null && e.getValue().get(OFFSET_KEY) != null)
             .collect(Collectors.toMap(e -> e.getKey().get(TOPIC_PARTITION_KEY), e -> (long) e.getValue().get(OFFSET_KEY)));
         // Set up Kafka consumer
-        consumer = new KafkaConsumer<byte[], byte[]>(props);
+        consumer = new KafkaConsumer<byte[], byte[]>(sourceConnectorConfig.getKafkaConsumerProperties());
         // Get topic partitions and offsets so we can seek() to them
         Map<TopicPartition, Long> topicPartitionOffsets = new HashMap<>();
         List<TopicPartition> topicPartitionsWithUnknownOffset = new ArrayList<>();

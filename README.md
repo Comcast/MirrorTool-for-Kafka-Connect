@@ -79,3 +79,10 @@ Note that standard Kafka parameters can be passed to the internal KafkaConsumer 
   }
 }
 ```
+
+## TODO
+
+* Config Parameters to use source.[config_parameter_name]
+  * Override admin or consumer client by setting source.[admin|consumer].[config_parameter_name]
+* Topics to accept list of strings or list of regexes (or both!)
+* Manually commit offsets to source cluster. These arent used for resuming the mirror process, (tyhe offsets sre stored in the kafka connect offsets store), but are included to allow existing offset monitoring tools to better work.
