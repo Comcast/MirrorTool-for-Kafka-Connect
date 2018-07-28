@@ -56,15 +56,16 @@ public class KafkaSourceTaskTest {
     private Properties props;
     private KafkaSourceConnectorConfig config;
 
-    private String MAX_SHUTDOWN_WAIT_MS_CONFIG = "2000";
-    private String POLL_LOOP_TIMEOUT_MS_CONFIG = "5";
-    private String DESTINATION_TOPIC_PREFIX_CONFIG = "test.destination";
-    private String INCLUDE_MESSAGE_HEADERS_CONFIG = "false";
-    private String CONSUMER_AUTO_OFFSET_RESET_CONFIG = "0";
-    private String SOURCE_BOOTSTRAP_SERVERS_CONFIG = "localhost:6000";
-    private String TASK_LEADER_TOPIC_PARTITION_CONFIG = "0:test.topic:1";
-    private String AUTO_OFFSET_RESET_CONFIG = "latest";
-    private String SOURCE_TOPICS_WHITELIST_CONFIG = "test*";
+    private String MAX_SHUTDOWN_WAIT_MS_VALUE = "2000";
+    private String POLL_LOOP_TIMEOUT_MS_VALUE = "25";
+    private String DESTINATION_TOPIC_PREFIX_VALUE = "test.destination";
+    private String INCLUDE_MESSAGE_HEADERS_VALUE = "false";
+    private String CONSUMER_AUTO_OFFSET_RESET_VALUE = "0";
+    private String SOURCE_BOOTSTRAP_SERVERS_VALUE = "localhost:6000";
+    private String TASK_LEADER_TOPIC_PARTITION_VALUE = "0:test.topic:1";
+    private String AUTO_OFFSET_RESET_VALUE = "latest";
+    private String SOURCE_TOPICS_WHITELIST_VALUE = "test*";
+    private static final String CONSUMER_GROUP_ID_VALUE = "test-consumer-group";
 
 
     private String FIRST_TOPIC = "test.topic";
@@ -83,15 +84,16 @@ public class KafkaSourceTaskTest {
     public void setup() {
 
         opts = new HashMap<>();
-        opts.put(KafkaSourceConnectorConfig.SOURCE_TOPIC_WHITELIST_CONFIG, SOURCE_TOPICS_WHITELIST_CONFIG);
-        opts.put(KafkaSourceConnectorConfig.MAX_SHUTDOWN_WAIT_MS_CONFIG, MAX_SHUTDOWN_WAIT_MS_CONFIG);
-        opts.put(KafkaSourceConnectorConfig.POLL_LOOP_TIMEOUT_MS_CONFIG, POLL_LOOP_TIMEOUT_MS_CONFIG);
-        opts.put(KafkaSourceConnectorConfig.DESTINATION_TOPIC_PREFIX_CONFIG, DESTINATION_TOPIC_PREFIX_CONFIG);
-        opts.put(KafkaSourceConnectorConfig.INCLUDE_MESSAGE_HEADERS_CONFIG, INCLUDE_MESSAGE_HEADERS_CONFIG);
-        opts.put(KafkaSourceConnectorConfig.CONSUMER_AUTO_OFFSET_RESET_CONFIG, CONSUMER_AUTO_OFFSET_RESET_CONFIG);
-        opts.put(KafkaSourceConnectorConfig.SOURCE_BOOTSTRAP_SERVERS_CONFIG, SOURCE_BOOTSTRAP_SERVERS_CONFIG);
-        opts.put(KafkaSourceConnectorConfig.TASK_LEADER_TOPIC_PARTITION_CONFIG, TASK_LEADER_TOPIC_PARTITION_CONFIG);
-        opts.put(KafkaSourceConnectorConfig.CONSUMER_AUTO_OFFSET_RESET_CONFIG, AUTO_OFFSET_RESET_CONFIG);
+        opts.put(KafkaSourceConnectorConfig.SOURCE_TOPIC_WHITELIST_CONFIG, SOURCE_TOPICS_WHITELIST_VALUE);
+        opts.put(KafkaSourceConnectorConfig.MAX_SHUTDOWN_WAIT_MS_CONFIG, MAX_SHUTDOWN_WAIT_MS_VALUE);
+        opts.put(KafkaSourceConnectorConfig.POLL_LOOP_TIMEOUT_MS_CONFIG, POLL_LOOP_TIMEOUT_MS_VALUE);
+        opts.put(KafkaSourceConnectorConfig.DESTINATION_TOPIC_PREFIX_CONFIG, DESTINATION_TOPIC_PREFIX_VALUE);
+        opts.put(KafkaSourceConnectorConfig.INCLUDE_MESSAGE_HEADERS_CONFIG, INCLUDE_MESSAGE_HEADERS_VALUE);
+        opts.put(KafkaSourceConnectorConfig.CONSUMER_AUTO_OFFSET_RESET_CONFIG, CONSUMER_AUTO_OFFSET_RESET_VALUE);
+        opts.put(KafkaSourceConnectorConfig.SOURCE_BOOTSTRAP_SERVERS_CONFIG, SOURCE_BOOTSTRAP_SERVERS_VALUE);
+        opts.put(KafkaSourceConnectorConfig.TASK_LEADER_TOPIC_PARTITION_CONFIG, TASK_LEADER_TOPIC_PARTITION_VALUE);
+        opts.put(KafkaSourceConnectorConfig.CONSUMER_AUTO_OFFSET_RESET_CONFIG, AUTO_OFFSET_RESET_VALUE);
+        opts.put(KafkaSourceConnectorConfig.CONSUMER_GROUP_ID_CONFIG, CONSUMER_GROUP_ID_VALUE);
 
         config = new KafkaSourceConnectorConfig(opts);
         props = new Properties();
@@ -252,7 +254,7 @@ public class KafkaSourceTaskTest {
 
     @Test
     public void testStartSomeStoredPartitions() throws Exception {
-        opts.put(KafkaSourceConnectorConfig.TASK_LEADER_TOPIC_PARTITION_CONFIG, TASK_LEADER_TOPIC_PARTITION_CONFIG + "," + "0:" + SECOND_TOPIC + ":" + SECOND_PARTITION);
+        opts.put(KafkaSourceConnectorConfig.TASK_LEADER_TOPIC_PARTITION_CONFIG, TASK_LEADER_TOPIC_PARTITION_VALUE + "," + "0:" + SECOND_TOPIC + ":" + SECOND_PARTITION);
         config = new KafkaSourceConnectorConfig(opts);
         props = new Properties();
         props.putAll(config.allWithPrefix(KafkaSourceConnectorConfig.CONSUMER_PREFIX));
@@ -290,7 +292,7 @@ public class KafkaSourceTaskTest {
     @Test
     public void testPollNoRecords() throws Exception {
         mockConsumerInitialization();
-        EasyMock.expect(consumer.poll(5)).andReturn(new ConsumerRecords<>(Collections.EMPTY_MAP));
+        EasyMock.expect(consumer.poll(25)).andReturn(new ConsumerRecords<>(Collections.EMPTY_MAP));
         replayAll();
 
         objectUnderTest.start(opts);
@@ -305,7 +307,7 @@ public class KafkaSourceTaskTest {
     @Test
     public void testPollRecordReturnedNoIncludeHeaders() throws Exception {
         mockConsumerInitialization();
-        EasyMock.expect(consumer.poll(5)).andReturn(createTestRecords());
+        EasyMock.expect(consumer.poll(25)).andReturn(createTestRecords());
         replayAll();
 
         objectUnderTest.start(opts);
@@ -348,7 +350,7 @@ public class KafkaSourceTaskTest {
 
 
         // expectation for poll
-        EasyMock.expect(consumer.poll(5)).andReturn(createTestRecordsWithHeaders());
+        EasyMock.expect(consumer.poll(25)).andReturn(createTestRecordsWithHeaders());
         replayAll();
 
         objectUnderTest.start(opts);

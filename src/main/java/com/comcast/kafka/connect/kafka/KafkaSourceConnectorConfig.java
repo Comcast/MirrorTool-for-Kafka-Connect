@@ -45,9 +45,9 @@ public class KafkaSourceConnectorConfig extends AbstractConfig {
     public static final String DESTINATION_PREFIX =         "destination.";
 
     // Any config beginning with this prefix will set the config parameters for the kafka consumer used in this connector
-    public static final String CONSUMER_PREFIX =            "consumer.";
+    public static final String CONSUMER_PREFIX =            "connector.consumer.";
     // Any config beginning with this prefix will set the config parameters for the admin client used by the partition monitor
-    public static final String ADMIN_CLIENT_PREFIX =        "admin.";
+    public static final String ADMIN_CLIENT_PREFIX =        "connector.admin.";
 
     public static final String TASK_PREFIX =                "task.";
 
@@ -60,6 +60,7 @@ public class KafkaSourceConnectorConfig extends AbstractConfig {
     public static final String SOURCE_TOPIC_WHITELIST_DOC =            "Regular expressions indicating the topics to consume from the source cluster. " +
             "Under the hood, the regex is compiled to a <code>java.util.regex.Pattern</code>. " +
             "For convenience, comma (',') is interpreted as interpreted as the regex-choice symbol ('|').";
+    public static final Object SOURCE_TOPIC_WHITELIST_DEFAULT =         ConfigDef.NO_DEFAULT_VALUE;
     public static final String DESTINATION_TOPIC_PREFIX_CONFIG =        DESTINATION_PREFIX.concat("topics.prefix");
     public static final String DESTINATION_TOPIC_PREFIX_DOC =           "Prefix to add to source topic names when delivering messages to destination server";
     public static final String DESTINATION_TOPIC_PREFIX_DEFAULT =       "";
@@ -90,6 +91,8 @@ public class KafkaSourceConnectorConfig extends AbstractConfig {
     // General Source Kafka Config - Applies to Consumer and Admin Client if not overridden by CONSUMER_PREFIX or ADMIN_CLIENT_PREFIX
     public static final String SOURCE_BOOTSTRAP_SERVERS_CONFIG =          SOURCE_PREFIX.concat("bootstrap.servers");
     public static final String SOURCE_BOOTSTRAP_SERVERS_DOC =             "list of kafka brokers to use to bootstrap the source cluster";
+    public static final Object SOURCE_BOOTSTRAP_SERVERS_DEFAULT =         ConfigDef.NO_DEFAULT_VALUE;
+
     // These are the kafka consumer configs we override defaults for
     // Note that *any* kafka consumer config can be set by adding the
     // CONSUMER_PREFIX in front of the standard consumer config strings
@@ -111,17 +114,15 @@ public class KafkaSourceConnectorConfig extends AbstractConfig {
             "Note that these offsets are not used to resume the connector (They are stored in the Kafka Connect offset store), but may be useful in monitoring the current offset lag " +
             "of this connector on the source cluster";
     public static final Boolean CONSUMER_ENABLE_AUTO_COMMIT_DEFAULT =        true;
-    // TODO: If enable.auto.commit is set to true, AND group.id is null, then throw a config error. Need to set group.id if enable.auto.commit is turned on so offsets have a group assigned with them
-    /*
+
     public static final String CONSUMER_GROUP_ID_CONFIG =         SOURCE_PREFIX.concat("group.id");
     public static final String CONSUMER_GROUP_ID_DOC =            "Source Kafka Consumer group id. This must be set if source.enable.auto.commit is set as a group id is required for offset tracking on the source cluster";
-    public static final String CONSUMER_GROUP_ID_DEFAULT =        null;
-    */
+    public static final Object CONSUMER_GROUP_ID_DEFAULT =        ConfigDef.NO_DEFAULT_VALUE;
 
 
     // Config definition
     public static ConfigDef CONFIG = new ConfigDef()
-        .define(SOURCE_TOPIC_WHITELIST_CONFIG, Type.STRING, ConfigDef.NO_DEFAULT_VALUE, TopicWhitelistRegexValidator, Importance.HIGH, SOURCE_TOPIC_WHITELIST_DOC)
+        .define(SOURCE_TOPIC_WHITELIST_CONFIG, Type.STRING, SOURCE_TOPIC_WHITELIST_DEFAULT, TopicWhitelistRegexValidator, Importance.HIGH, SOURCE_TOPIC_WHITELIST_DOC)
         .define(DESTINATION_TOPIC_PREFIX_CONFIG, Type.STRING, DESTINATION_TOPIC_PREFIX_DEFAULT, Importance.MEDIUM, DESTINATION_TOPIC_PREFIX_DOC)
         .define(INCLUDE_MESSAGE_HEADERS_CONFIG, Type.BOOLEAN, INCLUDE_MESSAGE_HEADERS_DEFAULT, Importance.MEDIUM, INCLUDE_MESSAGE_HEADERS_DOC)
         .define(TOPIC_LIST_TIMEOUT_MS_CONFIG, Type.INT, TOPIC_LIST_TIMEOUT_MS_DEFAULT, Importance.LOW, TOPIC_LIST_TIMEOUT_MS_DOC)
@@ -129,12 +130,13 @@ public class KafkaSourceConnectorConfig extends AbstractConfig {
         .define(RECONFIGURE_TASKS_ON_LEADER_CHANGE_CONFIG, Type.BOOLEAN, RECONFIGURE_TASKS_ON_LEADER_CHANGE_DEFAULT, Importance.MEDIUM, RECONFIGURE_TASKS_ON_LEADER_CHANGE_DOC)
         .define(POLL_LOOP_TIMEOUT_MS_CONFIG, Type.INT, POLL_LOOP_TIMEOUT_MS_DEFAULT, Importance.LOW, POLL_LOOP_TIMEOUT_MS_DOC)
         .define(MAX_SHUTDOWN_WAIT_MS_CONFIG, Type.INT, MAX_SHUTDOWN_WAIT_MS_DEFAULT, Importance.LOW, MAX_SHUTDOWN_WAIT_MS_DOC)
-        .define(SOURCE_BOOTSTRAP_SERVERS_CONFIG, Type.LIST, ConfigDef.NO_DEFAULT_VALUE, NonEmptyListValidator, Importance.HIGH, SOURCE_BOOTSTRAP_SERVERS_DOC)
+        .define(SOURCE_BOOTSTRAP_SERVERS_CONFIG, Type.LIST, SOURCE_BOOTSTRAP_SERVERS_DEFAULT, NonEmptyListValidator, Importance.HIGH, SOURCE_BOOTSTRAP_SERVERS_DOC)
         .define(CONSUMER_MAX_POLL_RECORDS_CONFIG, Type.INT, CONSUMER_MAX_POLL_RECORDS_DEFAULT, Importance.LOW, CONSUMER_MAX_POLL_RECORDS_DOC)
         .define(CONSUMER_AUTO_OFFSET_RESET_CONFIG, Type.STRING, CONSUMER_AUTO_OFFSET_RESET_DEFAULT, CONSUMER_AUTO_OFFSET_RESET_VALIDATOR, Importance.MEDIUM, CONSUMER_AUTO_OFFSET_RESET_DOC)
         .define(CONSUMER_KEY_DESERIALIZER_CONFIG, Type.STRING, CONSUMER_KEY_DESERIALIZER_DEFAULT, Importance.LOW, CONSUMER_KEY_DESERIALIZER_DOC)
         .define(CONSUMER_VALUE_DESERIALIZER_CONFIG, Type.STRING, CONSUMER_VALUE_DESERIALIZER_DEFAULT, Importance.LOW, CONSUMER_VALUE_DESERIALIZER_DOC)
-        .define(CONSUMER_ENABLE_AUTO_COMMIT_CONFIG, Type.BOOLEAN, CONSUMER_ENABLE_AUTO_COMMIT_DEFAULT, Importance.LOW, CONSUMER_ENABLE_AUTO_COMMIT_DOC);
+        .define(CONSUMER_ENABLE_AUTO_COMMIT_CONFIG, Type.BOOLEAN, CONSUMER_ENABLE_AUTO_COMMIT_DEFAULT, Importance.LOW, CONSUMER_ENABLE_AUTO_COMMIT_DOC)
+        .define(CONSUMER_GROUP_ID_CONFIG, Type.STRING, CONSUMER_GROUP_ID_DEFAULT, new ConfigDef.NonEmptyString(), Importance.MEDIUM, CONSUMER_GROUP_ID_DOC);
 
     public KafkaSourceConnectorConfig(Map<String, String> props) {
         super(CONFIG, props);

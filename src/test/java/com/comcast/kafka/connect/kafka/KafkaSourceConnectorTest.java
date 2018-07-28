@@ -50,6 +50,7 @@ public class KafkaSourceConnectorTest extends EasyMockSupport {
     private static final String SOURCE_BOOTSTRAP_SERVERS_CONFIG = "localhost:6000";
     private static final String POLL_LOOP_TIMEOUT_MS_VALUE = "2000";
     private static final String TOPIC_LIST_TIMEOUT_MS_VALUE = "5000";
+    private static final String CONSUMER_GROUP_ID_VALUE = "test-consumer-group";
 
     @Before
     public void setUp() throws Exception {
@@ -64,6 +65,7 @@ public class KafkaSourceConnectorTest extends EasyMockSupport {
         sourceProperties.put(KafkaSourceConnectorConfig.SOURCE_BOOTSTRAP_SERVERS_CONFIG, SOURCE_BOOTSTRAP_SERVERS_CONFIG);
         sourceProperties.put(KafkaSourceConnectorConfig.POLL_LOOP_TIMEOUT_MS_CONFIG, POLL_LOOP_TIMEOUT_MS_VALUE);
         sourceProperties.put(KafkaSourceConnectorConfig.TOPIC_LIST_TIMEOUT_MS_CONFIG, TOPIC_LIST_TIMEOUT_MS_VALUE);
+        sourceProperties.put(KafkaSourceConnectorConfig.CONSUMER_GROUP_ID_CONFIG, CONSUMER_GROUP_ID_VALUE);
 
         // Default leader topic partitions to return (just one)
         stubLeaderTopicPartitions = new HashSet<>();
