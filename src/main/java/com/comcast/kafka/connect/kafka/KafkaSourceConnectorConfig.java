@@ -14,15 +14,39 @@ import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.common.config.ConfigDef.Importance;
 import org.apache.kafka.common.config.ConfigDef.Type;
+import org.apache.kafka.common.config.ConfigDef.Validator;
+import org.apache.kafka.common.config.ConfigDef.ValidString;
+import org.apache.kafka.common.config.ConfigException;
 
 import java.util.*;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 public class KafkaSourceConnectorConfig extends AbstractConfig {
+
+    public static final Validator NonEmptyListValidator =  new ConfigDef.Validator() {
+        @Override
+        public void ensureValid(String name, Object value) {
+            if (((List<String>) value).isEmpty()) {
+                throw new ConfigException("At least one bootstrap server must be configured in " + name);
+            };
+        }
+    };
+
+    public static final Validator TopicWhitelistRegexValidator =  new ConfigDef.Validator() {
+        @Override
+        public void ensureValid(String name, Object value) {
+            getTopicWhitelistPattern((String) value);
+        }
+    };
 
     // Config Prefixes
     public static final String SOURCE_PREFIX =              "source.";
     public static final String DESTINATION_PREFIX =         "destination.";
+
+    // Any config beginning with this prefix will set the config parameters for the kafka consumer used in this connector
     public static final String CONSUMER_PREFIX =            "consumer.";
+    // Any config beginning with this prefix will set the config parameters for the admin client used by the partition monitor
     public static final String ADMIN_CLIENT_PREFIX =        "admin.";
 
     public static final String TASK_PREFIX =                "task.";
@@ -33,8 +57,9 @@ public class KafkaSourceConnectorConfig extends AbstractConfig {
     // General Connector config
     // Topics
     public static final String SOURCE_TOPIC_WHITELIST_CONFIG =         SOURCE_PREFIX.concat("topic.whitelist");
-    public static final String SOURCE_TOPIC_WHITELIST_DOC =            "List of regular expressions indicating the topics to consume from the source cluster. " +
-            "Under the hood, the regex is compiled to a <code>java.util.regex.Pattern</code>.";
+    public static final String SOURCE_TOPIC_WHITELIST_DOC =            "Regular expressions indicating the topics to consume from the source cluster. " +
+            "Under the hood, the regex is compiled to a <code>java.util.regex.Pattern</code>. " +
+            "For convenience, comma (',') is interpreted as interpreted as the regex-choice symbol ('|').";
     public static final String DESTINATION_TOPIC_PREFIX_CONFIG =        DESTINATION_PREFIX.concat("topics.prefix");
     public static final String DESTINATION_TOPIC_PREFIX_DOC =           "Prefix to add to source topic names when delivering messages to destination server";
     public static final String DESTINATION_TOPIC_PREFIX_DEFAULT =       "";
@@ -68,26 +93,35 @@ public class KafkaSourceConnectorConfig extends AbstractConfig {
     // These are the kafka consumer configs we override defaults for
     // Note that *any* kafka consumer config can be set by adding the
     // CONSUMER_PREFIX in front of the standard consumer config strings
-    public static final String CONSUMER_MAX_POLL_RECORDS_CONFIG =           CONSUMER_PREFIX.concat("max.poll.records");
+    public static final String CONSUMER_MAX_POLL_RECORDS_CONFIG =           SOURCE_PREFIX.concat("max.poll.records");
     public static final String CONSUMER_MAX_POLL_RECORDS_DOC =              "Maximum number of records to return from each poll of the consumer";
     public static final int CONSUMER_MAX_POLL_RECORDS_DEFAULT =             500;
-    public static final String CONSUMER_AUTO_OFFSET_RESET_CONFIG =          CONSUMER_PREFIX.concat("auto.offset.reset");
+    public static final String CONSUMER_AUTO_OFFSET_RESET_CONFIG =          SOURCE_PREFIX.concat("auto.offset.reset");
     public static final String CONSUMER_AUTO_OFFSET_RESET_DOC =             "If there is no stored offset for a partition, where to reset from [earliest|latest].";
     public static final String CONSUMER_AUTO_OFFSET_RESET_DEFAULT =         "earliest";
-    public static final String CONSUMER_KEY_DESERIALIZER_CONFIG =           CONSUMER_PREFIX.concat("key.deserializer");
+    public static final ValidString CONSUMER_AUTO_OFFSET_RESET_VALIDATOR =  ConfigDef.ValidString.in("earliest", "latest");
+    public static final String CONSUMER_KEY_DESERIALIZER_CONFIG =           SOURCE_PREFIX.concat("key.deserializer");
     public static final String CONSUMER_KEY_DESERIALIZER_DOC =              "Key deserializer to use for the kafka consumers connecting to the source cluster.";
     public static final String CONSUMER_KEY_DESERIALIZER_DEFAULT =          "org.apache.kafka.common.serialization.ByteArrayDeserializer";
-    public static final String CONSUMER_VALUE_DESERIALIZER_CONFIG =         CONSUMER_PREFIX.concat("value.deserializer");
+    public static final String CONSUMER_VALUE_DESERIALIZER_CONFIG =         SOURCE_PREFIX.concat("value.deserializer");
     public static final String CONSUMER_VALUE_DESERIALIZER_DOC =            "Value deserializer to use for the kafka consumers connecting to the source cluster.";
     public static final String CONSUMER_VALUE_DESERIALIZER_DEFAULT =        "org.apache.kafka.common.serialization.ByteArrayDeserializer";
-    
-
-
+    public static final String CONSUMER_ENABLE_AUTO_COMMIT_CONFIG =         SOURCE_PREFIX.concat("enable.auto.commit");
+    public static final String CONSUMER_ENABLE_AUTO_COMMIT_DOC =            "If true the consumer's offset will be periodically committed to the source cluster in the background. "+
+            "Note that these offsets are not used to resume the connector (They are stored in the Kafka Connect offset store), but may be useful in monitoring the current offset lag " +
+            "of this connector on the source cluster";
+    public static final Boolean CONSUMER_ENABLE_AUTO_COMMIT_DEFAULT =        true;
+    // TODO: If enable.auto.commit is set to true, AND group.id is null, then throw a config error. Need to set group.id if enable.auto.commit is turned on so offsets have a group assigned with them
+    /*
+    public static final String CONSUMER_GROUP_ID_CONFIG =         SOURCE_PREFIX.concat("group.id");
+    public static final String CONSUMER_GROUP_ID_DOC =            "Source Kafka Consumer group id. This must be set if source.enable.auto.commit is set as a group id is required for offset tracking on the source cluster";
+    public static final String CONSUMER_GROUP_ID_DEFAULT =        null;
+    */
 
 
     // Config definition
     public static ConfigDef CONFIG = new ConfigDef()
-        .define(SOURCE_TOPIC_WHITELIST_CONFIG, Type.LIST, Importance.HIGH, SOURCE_TOPIC_WHITELIST_DOC)
+        .define(SOURCE_TOPIC_WHITELIST_CONFIG, Type.STRING, ConfigDef.NO_DEFAULT_VALUE, TopicWhitelistRegexValidator, Importance.HIGH, SOURCE_TOPIC_WHITELIST_DOC)
         .define(DESTINATION_TOPIC_PREFIX_CONFIG, Type.STRING, DESTINATION_TOPIC_PREFIX_DEFAULT, Importance.MEDIUM, DESTINATION_TOPIC_PREFIX_DOC)
         .define(INCLUDE_MESSAGE_HEADERS_CONFIG, Type.BOOLEAN, INCLUDE_MESSAGE_HEADERS_DEFAULT, Importance.MEDIUM, INCLUDE_MESSAGE_HEADERS_DOC)
         .define(TOPIC_LIST_TIMEOUT_MS_CONFIG, Type.INT, TOPIC_LIST_TIMEOUT_MS_DEFAULT, Importance.LOW, TOPIC_LIST_TIMEOUT_MS_DOC)
@@ -95,11 +129,12 @@ public class KafkaSourceConnectorConfig extends AbstractConfig {
         .define(RECONFIGURE_TASKS_ON_LEADER_CHANGE_CONFIG, Type.BOOLEAN, RECONFIGURE_TASKS_ON_LEADER_CHANGE_DEFAULT, Importance.MEDIUM, RECONFIGURE_TASKS_ON_LEADER_CHANGE_DOC)
         .define(POLL_LOOP_TIMEOUT_MS_CONFIG, Type.INT, POLL_LOOP_TIMEOUT_MS_DEFAULT, Importance.LOW, POLL_LOOP_TIMEOUT_MS_DOC)
         .define(MAX_SHUTDOWN_WAIT_MS_CONFIG, Type.INT, MAX_SHUTDOWN_WAIT_MS_DEFAULT, Importance.LOW, MAX_SHUTDOWN_WAIT_MS_DOC)
-        .define(SOURCE_BOOTSTRAP_SERVERS_CONFIG, Type.LIST, Importance.HIGH, SOURCE_BOOTSTRAP_SERVERS_DOC)
+        .define(SOURCE_BOOTSTRAP_SERVERS_CONFIG, Type.LIST, ConfigDef.NO_DEFAULT_VALUE, NonEmptyListValidator, Importance.HIGH, SOURCE_BOOTSTRAP_SERVERS_DOC)
         .define(CONSUMER_MAX_POLL_RECORDS_CONFIG, Type.INT, CONSUMER_MAX_POLL_RECORDS_DEFAULT, Importance.LOW, CONSUMER_MAX_POLL_RECORDS_DOC)
-        .define(CONSUMER_AUTO_OFFSET_RESET_CONFIG, Type.STRING, CONSUMER_AUTO_OFFSET_RESET_DEFAULT, Importance.MEDIUM, CONSUMER_AUTO_OFFSET_RESET_DOC)
+        .define(CONSUMER_AUTO_OFFSET_RESET_CONFIG, Type.STRING, CONSUMER_AUTO_OFFSET_RESET_DEFAULT, CONSUMER_AUTO_OFFSET_RESET_VALIDATOR, Importance.MEDIUM, CONSUMER_AUTO_OFFSET_RESET_DOC)
         .define(CONSUMER_KEY_DESERIALIZER_CONFIG, Type.STRING, CONSUMER_KEY_DESERIALIZER_DEFAULT, Importance.LOW, CONSUMER_KEY_DESERIALIZER_DOC)
-        .define(CONSUMER_VALUE_DESERIALIZER_CONFIG, Type.STRING, CONSUMER_VALUE_DESERIALIZER_DEFAULT, Importance.LOW, CONSUMER_VALUE_DESERIALIZER_DOC);
+        .define(CONSUMER_VALUE_DESERIALIZER_CONFIG, Type.STRING, CONSUMER_VALUE_DESERIALIZER_DEFAULT, Importance.LOW, CONSUMER_VALUE_DESERIALIZER_DOC)
+        .define(CONSUMER_ENABLE_AUTO_COMMIT_CONFIG, Type.BOOLEAN, CONSUMER_ENABLE_AUTO_COMMIT_DEFAULT, Importance.LOW, CONSUMER_ENABLE_AUTO_COMMIT_DOC);
 
     public KafkaSourceConnectorConfig(Map<String, String> props) {
         super(CONFIG, props);
@@ -148,9 +183,9 @@ public class KafkaSourceConnectorConfig extends AbstractConfig {
     public Properties getAdminClientProperties() {
         Properties adminClientProps = new Properties();
         // By Default use any settings under SOURCE_PREFIX
-        adminClientProps.putAll(allWithPrefix(KafkaSourceConnectorConfig.SOURCE_PREFIX));
+        adminClientProps.putAll(allWithPrefix(SOURCE_PREFIX));
         // But override with anything under ADMIN_CLIENT_PREFIX
-        adminClientProps.putAll(allWithPrefix(KafkaSourceConnectorConfig.ADMIN_CLIENT_PREFIX));
+        adminClientProps.putAll(allWithPrefix(ADMIN_CLIENT_PREFIX));
         return adminClientProps;
     }
 
@@ -158,11 +193,27 @@ public class KafkaSourceConnectorConfig extends AbstractConfig {
     public Properties getKafkaConsumerProperties() {
         Properties kafkaConsumerProps = new Properties();
         // By Default use any settings under SOURCE_PREFIX
-        kafkaConsumerProps.putAll(allWithPrefix(KafkaSourceConnectorConfig.SOURCE_PREFIX));
+        kafkaConsumerProps.putAll(allWithPrefix(SOURCE_PREFIX));
         // But override with anything under CONSUMER_PREFIX
-        kafkaConsumerProps.putAll(allWithPrefix(KafkaSourceConnectorConfig.CONSUMER_PREFIX));
+        kafkaConsumerProps.putAll(allWithPrefix(CONSUMER_PREFIX));
         return kafkaConsumerProps;
     }
 
+    public Pattern getTopicWhitelistPattern() { return getTopicWhitelistPattern(getString(SOURCE_TOPIC_WHITELIST_CONFIG)); }
+
+    // Returns a java regex pattern that can be used to match kafka topics
+    private static Pattern getTopicWhitelistPattern(String rawRegex) {
+        String regex = rawRegex
+                .trim()
+                .replace(',', '|')
+                .replace(" ", "")
+                .replaceAll("^[\"']+","")
+                .replaceAll("[\"']+$",""); // property files may bring quotes
+        try {
+            return Pattern.compile(regex);
+        } catch (PatternSyntaxException e) {
+            throw new ConfigException(regex + " is an invalid regex for config " + SOURCE_TOPIC_WHITELIST_CONFIG);
+        }
+    }
 
 }

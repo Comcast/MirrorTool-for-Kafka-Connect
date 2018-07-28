@@ -35,7 +35,7 @@ public class PartitionMonitor {
 
     private AtomicBoolean shutdown = new AtomicBoolean(false);
     private AdminClient partitionMonitorClient;
-    private Set<Pattern> topicWhitelistPatterns;
+    private Pattern topicWhitelistPattern;
     private volatile Set<LeaderTopicPartition> currentLeaderTopicPartitions = new HashSet<>();
 
     private int maxShutdownWaitMs;
@@ -46,11 +46,8 @@ public class PartitionMonitor {
     private ScheduledExecutorService pollExecutorService;
     private ScheduledFuture<?> pollHandle;
 
-    PartitionMonitor(ConnectorContext connectorContext, KafkaSourceConnectorConfig sourceConnectorConfig) throws ConfigException {
-        topicWhitelistPatterns = sourceConnectorConfig.getList(KafkaSourceConnectorConfig.SOURCE_TOPIC_WHITELIST_CONFIG)
-            .stream()
-            .map(regex -> Pattern.compile(regex))
-            .collect(Collectors.toCollection(HashSet::new));
+    PartitionMonitor(ConnectorContext connectorContext, KafkaSourceConnectorConfig sourceConnectorConfig) {
+        topicWhitelistPattern = sourceConnectorConfig.getTopicWhitelistPattern();
         reconfigureTasksOnLeaderChange = sourceConnectorConfig.getBoolean(KafkaSourceConnectorConfig.RECONFIGURE_TASKS_ON_LEADER_CHANGE_CONFIG);
         topicPollIntervalMs = sourceConnectorConfig.getInt(KafkaSourceConnectorConfig.TOPIC_LIST_POLL_INTERVAL_MS_CONFIG);;
         maxShutdownWaitMs = sourceConnectorConfig.getInt(KafkaSourceConnectorConfig.MAX_SHUTDOWN_WAIT_MS_CONFIG);;
@@ -129,7 +126,7 @@ public class PartitionMonitor {
     }
 
     private boolean matchedTopicFilter(String topic) {
-        return topicWhitelistPatterns.stream().anyMatch(pattern -> pattern.matcher(topic).matches());
+        return topicWhitelistPattern.matcher(topic).matches();
     }
 
     private synchronized void setCurrentLeaderTopicPartitions(Set<LeaderTopicPartition> leaderTopicPartitions) {

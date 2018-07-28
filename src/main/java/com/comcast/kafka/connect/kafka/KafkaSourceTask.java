@@ -151,24 +151,19 @@ public class KafkaSourceTask extends SourceTask {
                         records.add(new SourceRecord(sourcePartition, sourceOffset, destinationTopic, null, Schema.OPTIONAL_BYTES_SCHEMA, krecord.key(), Schema.OPTIONAL_BYTES_SCHEMA, krecord.value(), krecord.timestamp(), destinationHeaders));
                     } else {
                         records.add(new SourceRecord(sourcePartition, sourceOffset, destinationTopic, null, Schema.OPTIONAL_BYTES_SCHEMA, krecord.key(), Schema.OPTIONAL_BYTES_SCHEMA, krecord.value(), krecord.timestamp()));
-
                     }
                 }
             } catch (WakeupException e) {
                 LOG.info("{}: Caught WakeupException. Probably shutting down.", this);
             }
         }
-        synchronized (stopLock) {
-            // Existing poll(), set concurrency flag
-            poll.set(false);
-            // If stop has been set  processing, then stop the consumer.
-            if (LOG.isDebugEnabled()) LOG.trace("{}: stop.get() = {}", this, stop.get());
-            if (stop.get()) {
-                LOG.info("{}: stop flag set during poll(), opening stopLatch", this);
-                stopLatch.countDown();
-                // If stopping, return immediately without records.
-                return null;
-            }
+        // Existing poll(), set concurrency flag
+        poll.set(false);
+        // If stop has been set  processing, then stop the consumer.
+        if (LOG.isDebugEnabled()) LOG.trace("{}: stop.get() = {}", this, stop.get());
+        if (stop.get()) {
+            LOG.info("{}: stop flag set during poll(), opening stopLatch", this);
+            stopLatch.countDown();
         }
         if (LOG.isDebugEnabled()) LOG.debug("{}: Returning {} records to connect", this, records.size());
         return records;
@@ -182,7 +177,7 @@ public class KafkaSourceTask extends SourceTask {
             LOG.info("{}: stop() called. Waking up consumer and shutting down", this);
             consumer.wakeup();
             if (LOG.isDebugEnabled()) LOG.trace("{}: poll.get() = {}", this, poll.get());
-            if(!poll.get()) {
+            if (!poll.get()) {
                 LOG.info("{}: poll() not active, shutting down consumer.", this);
                 consumer.close(Math.min(0, maxShutdownWait - (System.currentTimeMillis() - startWait)), TimeUnit.MILLISECONDS);
             } else {

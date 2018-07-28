@@ -44,9 +44,6 @@ public class KafkaSourceConnector extends SourceConnector {
     public void start(Map<String, String> config) throws ConfigException {
         LOG.info("Connector: start()");
         connectorConfig = new KafkaSourceConnectorConfig(config);
-        if (connectorConfig.getList(KafkaSourceConnectorConfig.SOURCE_BOOTSTRAP_SERVERS_CONFIG).isEmpty()) {
-            throw new ConfigException("At least one bootstrap server must be configured in " + KafkaSourceConnectorConfig.SOURCE_BOOTSTRAP_SERVERS_CONFIG);
-        }
         LOG.info("Starting Partition Monitor to monitor source kafka cluster partitions");
         partitionMonitor = new PartitionMonitor(context, connectorConfig);
         partitionMonitor.start();
