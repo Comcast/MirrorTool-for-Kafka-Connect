@@ -65,7 +65,7 @@ public class KafkaSourceConnector extends SourceConnector {
             .collect(Collectors.toList());
         int taskCount = Math.min(maxTasks, leaderTopicPartitions.size());
         if (taskCount < 1) {
-            LOG.info("No tasks to start.");
+            LOG.warn("No tasks to start.");
             return new ArrayList<>();
         }
         return ConnectorUtils.groupPartitions(leaderTopicPartitions, taskCount)
@@ -83,7 +83,7 @@ public class KafkaSourceConnector extends SourceConnector {
     public void stop() {
         LOG.info("Connector received stop(). Cleaning Up.");
         partitionMonitor.shutdown();
-        LOG.info("Stopped.");
+        LOG.info("Connector stopped.");
     }
 
     @Override

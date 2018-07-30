@@ -93,7 +93,7 @@ public class PartitionMonitor {
                         else
                             LOG.info("No partition changes which require reconfiguration have been detected.");
                     } catch (TimeoutException e) {
-                        LOG.error("Timeout while waiting for AdminClient to return topic list. This likely indicates a (possibly transient) connection issue, but could be an indicator that the timeout is set too low. {}", e);
+                        LOG.error("Timeout while waiting for AdminClient to return topic list. This indicates a (possibly transient) connection issue, or is an indicator that the timeout is set too low. {}", e);
                     } catch (ExecutionException e) {
                         LOG.error("Unexpected ExecutionException. {}", e);
                     } catch (InterruptedException e) {
@@ -138,14 +138,14 @@ public class PartitionMonitor {
     }
 
     // Allow the main thread a chance to shut down gracefully
-    public synchronized void shutdown() {
+    public void shutdown() {
         LOG.info("Shutdown called.");
         long startWait = System.currentTimeMillis();
         shutdown.set(true);
         partitionMonitorClient.close( maxShutdownWaitMs - (System.currentTimeMillis() - startWait), TimeUnit.MILLISECONDS);
         // Cancel our scheduled task, but wait for an existing task to complete if running
         pollHandle.cancel(false);
-        // Ask nicely to shut down the executor service if it hasnt already
+        // Ask nicely to shut down the partition monitor executor service if it hasn't already
         if (!pollExecutorService.isShutdown()) {
             try {
                 pollExecutorService.awaitTermination(maxShutdownWaitMs - (System.currentTimeMillis() - startWait), TimeUnit.MILLISECONDS);

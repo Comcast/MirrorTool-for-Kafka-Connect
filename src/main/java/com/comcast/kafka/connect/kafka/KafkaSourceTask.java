@@ -56,7 +56,7 @@ public class KafkaSourceTask extends SourceTask {
 
     // TODO: Maybe synchronize access to this function to ensure that stop() cant be called before the consumer is initialized? (Can stop even be called if start() hasnt returned?)
     public void start(Map<String, String> opts) {
-        LOG.info("{}: starting", this);
+        LOG.info("{}: task is starting.", this);
         KafkaSourceConnectorConfig sourceConnectorConfig = new KafkaSourceConnectorConfig(opts);
         maxShutdownWait = sourceConnectorConfig.getInt(KafkaSourceConnectorConfig.MAX_SHUTDOWN_WAIT_MS_CONFIG);
         pollTimeout = sourceConnectorConfig.getInt(KafkaSourceConnectorConfig.POLL_LOOP_TIMEOUT_MS_CONFIG);
@@ -128,13 +128,13 @@ public class KafkaSourceTask extends SourceTask {
         if (poll.get()) {
             try {
                 ConsumerRecords<byte[], byte[]> krecords = consumer.poll(pollTimeout);
-                if (LOG.isDebugEnabled()) LOG.debug("{}: Got {} records.", this, krecords.count());
+                if (LOG.isDebugEnabled()) LOG.debug("{}: Got {} records from source.", this, krecords.count());
                 for (ConsumerRecord<byte[], byte[]> krecord : krecords) {
                     Map sourcePartition = Collections.singletonMap(TOPIC_PARTITION_KEY, krecord.topic().toString().concat(":").concat(Integer.toString(krecord.partition())));
                     Map sourceOffset = Collections.singletonMap(OFFSET_KEY, krecord.offset());
                     String destinationTopic = topicPrefix.concat(krecord.topic());
                     if (LOG.isDebugEnabled()) {
-                        LOG.debug(
+                        LOG.trace(
                                 "Task: sourceTopic:{} sourcePartition:{} sourceOffSet:{} destinationTopic:{}, key:{}, valueSize:{}",
                                 krecord.topic(), krecord.partition(), krecord.offset(), destinationTopic, (krecord.key() != null) ? krecord.key().toString() : null, krecord.serializedValueSize()
                         );
@@ -157,12 +157,10 @@ public class KafkaSourceTask extends SourceTask {
                 LOG.info("{}: Caught WakeupException. Probably shutting down.", this);
             }
         }
-        // Existing poll(), set concurrency flag
         poll.set(false);
         // If stop has been set  processing, then stop the consumer.
-        if (LOG.isDebugEnabled()) LOG.trace("{}: stop.get() = {}", this, stop.get());
         if (stop.get()) {
-            LOG.info("{}: stop flag set during poll(), opening stopLatch", this);
+            LOG.debug("{}: stop flag set during poll(), opening stopLatch", this);
             stopLatch.countDown();
         }
         if (LOG.isDebugEnabled()) LOG.debug("{}: Returning {} records to connect", this, records.size());
@@ -176,23 +174,18 @@ public class KafkaSourceTask extends SourceTask {
             stop.set(true);
             LOG.info("{}: stop() called. Waking up consumer and shutting down", this);
             consumer.wakeup();
-            if (LOG.isDebugEnabled()) LOG.trace("{}: poll.get() = {}", this, poll.get());
-            if (!poll.get()) {
-                LOG.info("{}: poll() not active, shutting down consumer.", this);
-                consumer.close(Math.min(0, maxShutdownWait - (System.currentTimeMillis() - startWait)), TimeUnit.MILLISECONDS);
-            } else {
-                LOG.info("{}: poll() active, awaiting stopLatch before shutting down consumer", this);
+            if (poll.get()) {
+                LOG.debug("{}: poll() active, awaiting stopLatch before shutting down consumer", this);
                 try {
                     stopLatch.await(Math.min(0, maxShutdownWait - (System.currentTimeMillis() - startWait)), TimeUnit.MILLISECONDS);
                 } catch (InterruptedException e){
                     LOG.warn("{}: Got InterruptedException while waiting on stopLatch", this);
-                } finally {
-                    LOG.info("{}: Shutting down consumer", this);
-                    consumer.close(Math.min(0, maxShutdownWait - (System.currentTimeMillis() - startWait)), TimeUnit.MILLISECONDS);
                 }
             }
+            LOG.debug("{}: Shutting down consumer.", this);
+            consumer.close(Math.min(0, maxShutdownWait - (System.currentTimeMillis() - startWait)), TimeUnit.MILLISECONDS);
         }
-        LOG.info("{}: stopped", this);
+        LOG.info("{}: task has been stopped", this);
     }
 
 
