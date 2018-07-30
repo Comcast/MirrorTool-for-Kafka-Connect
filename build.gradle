@@ -9,33 +9,39 @@
  */
 
 
+
 plugins {
     id 'java'
     id 'idea'
     id 'com.github.johnrengelman.shadow' version '2.0.4'
 }
 
+version = '2.0.0'
+
+
+
 dependencies {
-    compile group: 'org.apache.kafka', name: 'connect-api', version: '1.1.0'
-    compile group: 'org.apache.kafka', name: 'kafka-clients', version: '1.1.0'
+    def kafkaVersion = '2.0.0'
+    def slf4jVersion = '1.7.25'
 
-    compile group: 'org.slf4j', name: 'slf4j-api', version: '1.6.1'
-    compile group: 'org.slf4j', name: 'slf4j-simple', version: '1.6.1'
+    compile group: 'org.apache.kafka', name: 'connect-api', version: kafkaVersion
+    compile group: 'org.apache.kafka', name: 'kafka-clients', version: kafkaVersion
+    compile group: 'org.slf4j', name: 'slf4j-api', version: slf4jVersion
+    compile group: 'org.slf4j', name: 'slf4j-simple', version: slf4jVersion
 
-    // Use JUnit test framework
-    testCompile 'junit:junit:4.12'
+    // Test
+    def junitVersion = '4.12'
+    def easymockVersion = '3.6'
+    def powermockVersion = '2.0.0-beta.5'
 
-    testCompile group: 'org.easymock', name: 'easymock', version: '3.5.1'
-    testCompile group: 'org.powermock', name: 'powermock-core', version: '2.0.0-beta.5'
-    testCompile group: 'org.powermock', name: 'powermock-module-junit4', version: '2.0.0-beta.5'
-    testCompile group: 'org.powermock', name: 'powermock-api-easymock', version: '2.0.0-beta.5'
-
+    testCompile group: 'junit', name: 'junit', version: junitVersion
+    testCompile group: 'org.easymock', name: 'easymock', version: easymockVersion
+    testCompile group: 'org.powermock', name: 'powermock-core', version: powermockVersion
+    testCompile group: 'org.powermock', name: 'powermock-module-junit4', version: powermockVersion
+    testCompile group: 'org.powermock', name: 'powermock-api-easymock', version: powermockVersion
 }
 
-// In this section you declare where to find the dependencies of your project
 repositories {
-    // Use jcenter for resolving your dependencies.
-    // You can declare any Maven/Ivy/file repository here.
     jcenter()
 }
 
@@ -43,8 +49,6 @@ compileJava   {
     sourceCompatibility = '1.8'
     targetCompatibility = '1.8'
 }
-
-version = "1.0.0"
 
 jar {
     manifest {

@@ -29,6 +29,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
+import java.time.Duration;
 
 
 public class KafkaSourceTask extends SourceTask {
@@ -54,18 +55,14 @@ public class KafkaSourceTask extends SourceTask {
     // Consumer
     private KafkaConsumer<byte[], byte[]> consumer;
 
-    // TODO: Maybe synchronize access to this function to ensure that stop() cant be called before the consumer is initialized? (Can stop even be called if start() hasnt returned?)
     public void start(Map<String, String> opts) {
-        LOG.info("{}: starting", this);
-        KafkaSourceConnectorConfig config = new KafkaSourceConnectorConfig(opts);
-        maxShutdownWait = config.getInt(KafkaSourceConnectorConfig.MAX_SHUTDOWN_WAIT_MS_CONFIG);
-        pollTimeout = config.getInt(KafkaSourceConnectorConfig.POLL_TIMEOUT_MS_CONFIG);
-        topicPrefix = config.getString(KafkaSourceConnectorConfig.DESTINATION_TOPIC_PREFIX_CONFIG);
-        includeHeaders = config.getBoolean(KafkaSourceConnectorConfig.INCLUDE_MESSAGE_HEADERS_CONFIG);
-        String unknownOffsetResetPosition = config.getString(KafkaSourceConnectorConfig.CONSUMER_AUTO_OFFSET_RESET_CONFIG);
-        // Kafka consumer config
-        Properties props = new Properties();
-        props.putAll(config.allWithPrefix(KafkaSourceConnectorConfig.CONSUMER_PREFIX));
+        LOG.info("{}: task is starting.", this);
+        KafkaSourceConnectorConfig sourceConnectorConfig = new KafkaSourceConnectorConfig(opts);
+        maxShutdownWait = sourceConnectorConfig.getInt(KafkaSourceConnectorConfig.MAX_SHUTDOWN_WAIT_MS_CONFIG);
+        pollTimeout = sourceConnectorConfig.getInt(KafkaSourceConnectorConfig.POLL_LOOP_TIMEOUT_MS_CONFIG);
+        topicPrefix = sourceConnectorConfig.getString(KafkaSourceConnectorConfig.DESTINATION_TOPIC_PREFIX_CONFIG);
+        includeHeaders = sourceConnectorConfig.getBoolean(KafkaSourceConnectorConfig.INCLUDE_MESSAGE_HEADERS_CONFIG);
+        String unknownOffsetResetPosition = sourceConnectorConfig.getString(KafkaSourceConnectorConfig.CONSUMER_AUTO_OFFSET_RESET_CONFIG);
         // Get the leader topic partitions to work with
         List<LeaderTopicPartition> leaderTopicPartitions = Arrays.asList(opts.get(KafkaSourceConnectorConfig.TASK_LEADER_TOPIC_PARTITION_CONFIG)
             .split(","))
@@ -82,7 +79,7 @@ public class KafkaSourceTask extends SourceTask {
             .filter(e -> e != null && e.getKey() != null && e.getKey().get(TOPIC_PARTITION_KEY) != null && e.getValue() != null && e.getValue().get(OFFSET_KEY) != null)
             .collect(Collectors.toMap(e -> e.getKey().get(TOPIC_PARTITION_KEY), e -> (long) e.getValue().get(OFFSET_KEY)));
         // Set up Kafka consumer
-        consumer = new KafkaConsumer<byte[], byte[]>(props);
+        consumer = new KafkaConsumer<byte[], byte[]>(sourceConnectorConfig.getKafkaConsumerProperties());
         // Get topic partitions and offsets so we can seek() to them
         Map<TopicPartition, Long> topicPartitionOffsets = new HashMap<>();
         List<TopicPartition> topicPartitionsWithUnknownOffset = new ArrayList<>();
@@ -130,14 +127,14 @@ public class KafkaSourceTask extends SourceTask {
         ArrayList<SourceRecord> records = new ArrayList<>();
         if (poll.get()) {
             try {
-                ConsumerRecords<byte[], byte[]> krecords = consumer.poll(pollTimeout);
-                if (LOG.isDebugEnabled()) LOG.debug("{}: Got {} records.", this, krecords.count());
+                ConsumerRecords<byte[], byte[]> krecords = consumer.poll(Duration.ofMillis(pollTimeout));
+                if (LOG.isDebugEnabled()) LOG.debug("{}: Got {} records from source.", this, krecords.count());
                 for (ConsumerRecord<byte[], byte[]> krecord : krecords) {
                     Map sourcePartition = Collections.singletonMap(TOPIC_PARTITION_KEY, krecord.topic().toString().concat(":").concat(Integer.toString(krecord.partition())));
                     Map sourceOffset = Collections.singletonMap(OFFSET_KEY, krecord.offset());
                     String destinationTopic = topicPrefix.concat(krecord.topic());
                     if (LOG.isDebugEnabled()) {
-                        LOG.debug(
+                        LOG.trace(
                                 "Task: sourceTopic:{} sourcePartition:{} sourceOffSet:{} destinationTopic:{}, key:{}, valueSize:{}",
                                 krecord.topic(), krecord.partition(), krecord.offset(), destinationTopic, (krecord.key() != null) ? krecord.key().toString() : null, krecord.serializedValueSize()
                         );
@@ -154,24 +151,17 @@ public class KafkaSourceTask extends SourceTask {
                         records.add(new SourceRecord(sourcePartition, sourceOffset, destinationTopic, null, Schema.OPTIONAL_BYTES_SCHEMA, krecord.key(), Schema.OPTIONAL_BYTES_SCHEMA, krecord.value(), krecord.timestamp(), destinationHeaders));
                     } else {
                         records.add(new SourceRecord(sourcePartition, sourceOffset, destinationTopic, null, Schema.OPTIONAL_BYTES_SCHEMA, krecord.key(), Schema.OPTIONAL_BYTES_SCHEMA, krecord.value(), krecord.timestamp()));
-
                     }
                 }
             } catch (WakeupException e) {
                 LOG.info("{}: Caught WakeupException. Probably shutting down.", this);
             }
         }
-        synchronized (stopLock) {
-            // Existing poll(), set concurrency flag
-            poll.set(false);
-            // If stop has been set  processing, then stop the consumer.
-            if (LOG.isDebugEnabled()) LOG.trace("{}: stop.get() = {}", this, stop.get());
-            if (stop.get()) {
-                LOG.info("{}: stop flag set during poll(), opening stopLatch", this);
-                stopLatch.countDown();
-                // If stopping, return immediately without records.
-                return null;
-            }
+        poll.set(false);
+        // If stop has been set  processing, then stop the consumer.
+        if (stop.get()) {
+            LOG.debug("{}: stop flag set during poll(), opening stopLatch", this);
+            stopLatch.countDown();
         }
         if (LOG.isDebugEnabled()) LOG.debug("{}: Returning {} records to connect", this, records.size());
         return records;
@@ -184,23 +174,18 @@ public class KafkaSourceTask extends SourceTask {
             stop.set(true);
             LOG.info("{}: stop() called. Waking up consumer and shutting down", this);
             consumer.wakeup();
-            if (LOG.isDebugEnabled()) LOG.trace("{}: poll.get() = {}", this, poll.get());
-            if(!poll.get()) {
-                LOG.info("{}: poll() not active, shutting down consumer.", this);
-                consumer.close(Math.min(0, maxShutdownWait - (System.currentTimeMillis() - startWait)), TimeUnit.MILLISECONDS);
-            } else {
-                LOG.info("{}: poll() active, awaiting stopLatch before shutting down consumer", this);
+            if (poll.get()) {
+                LOG.info("{}: poll() active, awaiting for consumer to wake before attempting to shut down consumer", this);
                 try {
-                    stopLatch.await(Math.min(0, maxShutdownWait - (System.currentTimeMillis() - startWait)), TimeUnit.MILLISECONDS);
+                    stopLatch.await(Math.max(0, maxShutdownWait - (System.currentTimeMillis() - startWait)), TimeUnit.MILLISECONDS);
                 } catch (InterruptedException e){
                     LOG.warn("{}: Got InterruptedException while waiting on stopLatch", this);
-                } finally {
-                    LOG.info("{}: Shutting down consumer", this);
-                    consumer.close(Math.min(0, maxShutdownWait - (System.currentTimeMillis() - startWait)), TimeUnit.MILLISECONDS);
                 }
             }
+            LOG.info("{}: Shutting down consumer.", this);
+            consumer.close(Duration.ofMillis(Math.max(0, maxShutdownWait - (System.currentTimeMillis() - startWait))));
         }
-        LOG.info("{}: stopped", this);
+        LOG.info("{}: task has been stopped", this);
     }
 
 

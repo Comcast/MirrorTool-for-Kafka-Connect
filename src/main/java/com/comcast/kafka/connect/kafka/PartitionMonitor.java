@@ -11,11 +11,9 @@
 package com.comcast.kafka.connect.kafka;
 
 import org.apache.kafka.clients.admin.*;
-import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.connect.connector.ConnectorContext;
 import org.apache.kafka.connect.errors.ConnectException;
-import org.apache.kafka.common.config.ConfigException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,8 +34,7 @@ public class PartitionMonitor {
 
     private AtomicBoolean shutdown = new AtomicBoolean(false);
     private AdminClient partitionMonitorClient;
-    private Set<String> topicsWhitelist;
-    private Pattern topicsRegexPattern;
+    private Pattern topicWhitelistPattern;
     private volatile Set<LeaderTopicPartition> currentLeaderTopicPartitions = new HashSet<>();
 
     private int maxShutdownWaitMs;
@@ -48,34 +45,13 @@ public class PartitionMonitor {
     private ScheduledExecutorService pollExecutorService;
     private ScheduledFuture<?> pollHandle;
 
-    // Constructor with topics list
-    PartitionMonitor(ConnectorContext connectorContext, Properties adminClientConfig, List<String> topicsList,
-                     boolean reconfigureOnLeaderChange, int pollIntervalMs, int topicListTimeout, int shutdownTimeout)
-            throws ConfigException {
-        this(connectorContext, adminClientConfig, topicsList, null, reconfigureOnLeaderChange, pollIntervalMs, topicListTimeout, shutdownTimeout);
-    }
-
-    // Constructor with topics regex
-    PartitionMonitor(ConnectorContext connectorContext, Properties adminClientConfig, String topicsRegexStr,
-                     boolean reconfigureOnLeaderChange, int pollIntervalMs, int topicListTimeout, int shutdownTimeout)
-            throws ConfigException {
-        this(connectorContext, adminClientConfig, null, topicsRegexStr, reconfigureOnLeaderChange, pollIntervalMs, topicListTimeout, shutdownTimeout);
-    }
-
-
-    PartitionMonitor(ConnectorContext connectorContext, Properties adminClientConfig, List<String> topicsList,
-                     String topicsRegexStr, boolean reconfigureOnLeaderChange, int pollIntervalMs,
-                     int topicListTimeout, int shutdownTimeout) throws ConfigException {
-        if (topicsList != null) {
-            topicsWhitelist = new HashSet<>(topicsList);
-        } else {
-            topicsRegexPattern = Pattern.compile(topicsRegexStr);
-        }
-        reconfigureTasksOnLeaderChange = reconfigureOnLeaderChange;
-        topicPollIntervalMs = pollIntervalMs;
-        maxShutdownWaitMs = shutdownTimeout;
-        topicRequestTimeoutMs = topicListTimeout;
-        partitionMonitorClient = AdminClient.create(adminClientConfig);
+    PartitionMonitor(ConnectorContext connectorContext, KafkaSourceConnectorConfig sourceConnectorConfig) {
+        topicWhitelistPattern = sourceConnectorConfig.getTopicWhitelistPattern();
+        reconfigureTasksOnLeaderChange = sourceConnectorConfig.getBoolean(KafkaSourceConnectorConfig.RECONFIGURE_TASKS_ON_LEADER_CHANGE_CONFIG);
+        topicPollIntervalMs = sourceConnectorConfig.getInt(KafkaSourceConnectorConfig.TOPIC_LIST_POLL_INTERVAL_MS_CONFIG);;
+        maxShutdownWaitMs = sourceConnectorConfig.getInt(KafkaSourceConnectorConfig.MAX_SHUTDOWN_WAIT_MS_CONFIG);;
+        topicRequestTimeoutMs = sourceConnectorConfig.getInt(KafkaSourceConnectorConfig.TOPIC_LIST_TIMEOUT_MS_CONFIG);;
+        partitionMonitorClient = AdminClient.create(sourceConnectorConfig.getAdminClientProperties());
         // Thread to periodically poll the kafka cluster for changes in topics or partititons
         pollThread = new Runnable() {
             @Override
@@ -116,7 +92,7 @@ public class PartitionMonitor {
                         else
                             LOG.info("No partition changes which require reconfiguration have been detected.");
                     } catch (TimeoutException e) {
-                        LOG.error("Timeout while waiting for AdminClient to return topic list. This likely indicates a (possibly transient) connection issue, but could be an indicator that the timeout is set too low. {}", e);
+                        LOG.error("Timeout while waiting for AdminClient to return topic list. This indicates a (possibly transient) connection issue, or is an indicator that the timeout is set too low. {}", e);
                     } catch (ExecutionException e) {
                         LOG.error("Unexpected ExecutionException. {}", e);
                     } catch (InterruptedException e) {
@@ -149,11 +125,7 @@ public class PartitionMonitor {
     }
 
     private boolean matchedTopicFilter(String topic) {
-        if (topicsWhitelist != null) {
-            return topicsWhitelist.contains(topic);
-        } else {
-            return topicsRegexPattern.matcher(topic).matches();
-        }
+        return topicWhitelistPattern.matcher(topic).matches();
     }
 
     private synchronized void setCurrentLeaderTopicPartitions(Set<LeaderTopicPartition> leaderTopicPartitions) {
@@ -165,14 +137,14 @@ public class PartitionMonitor {
     }
 
     // Allow the main thread a chance to shut down gracefully
-    public synchronized void shutdown() {
+    public void shutdown() {
         LOG.info("Shutdown called.");
         long startWait = System.currentTimeMillis();
         shutdown.set(true);
         partitionMonitorClient.close( maxShutdownWaitMs - (System.currentTimeMillis() - startWait), TimeUnit.MILLISECONDS);
         // Cancel our scheduled task, but wait for an existing task to complete if running
         pollHandle.cancel(false);
-        // Ask nicely to shut down the executor service if it hasnt already
+        // Ask nicely to shut down the partition monitor executor service if it hasn't already
         if (!pollExecutorService.isShutdown()) {
             try {
                 pollExecutorService.awaitTermination(maxShutdownWaitMs - (System.currentTimeMillis() - startWait), TimeUnit.MILLISECONDS);
