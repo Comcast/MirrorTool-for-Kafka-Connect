@@ -32,6 +32,7 @@ import org.powermock.core.classloader.annotations.PowerMockIgnore;
 import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.modules.junit4.PowerMockRunner;
 
+import java.time.Duration;
 import java.util.*;
 
 import static junit.framework.TestCase.assertTrue;
@@ -57,7 +58,7 @@ public class KafkaSourceTaskTest {
     private KafkaSourceConnectorConfig config;
 
     private String MAX_SHUTDOWN_WAIT_MS_VALUE = "2000";
-    private String POLL_LOOP_TIMEOUT_MS_VALUE = "25";
+    private int POLL_LOOP_TIMEOUT_MS_VALUE = 25;
     private String DESTINATION_TOPIC_PREFIX_VALUE = "test.destination";
     private String INCLUDE_MESSAGE_HEADERS_VALUE = "false";
     private String CONSUMER_AUTO_OFFSET_RESET_VALUE = "0";
@@ -86,7 +87,7 @@ public class KafkaSourceTaskTest {
         opts = new HashMap<>();
         opts.put(KafkaSourceConnectorConfig.SOURCE_TOPIC_WHITELIST_CONFIG, SOURCE_TOPICS_WHITELIST_VALUE);
         opts.put(KafkaSourceConnectorConfig.MAX_SHUTDOWN_WAIT_MS_CONFIG, MAX_SHUTDOWN_WAIT_MS_VALUE);
-        opts.put(KafkaSourceConnectorConfig.POLL_LOOP_TIMEOUT_MS_CONFIG, POLL_LOOP_TIMEOUT_MS_VALUE);
+        opts.put(KafkaSourceConnectorConfig.POLL_LOOP_TIMEOUT_MS_CONFIG, String.valueOf(POLL_LOOP_TIMEOUT_MS_VALUE));
         opts.put(KafkaSourceConnectorConfig.DESTINATION_TOPIC_PREFIX_CONFIG, DESTINATION_TOPIC_PREFIX_VALUE);
         opts.put(KafkaSourceConnectorConfig.INCLUDE_MESSAGE_HEADERS_CONFIG, INCLUDE_MESSAGE_HEADERS_VALUE);
         opts.put(KafkaSourceConnectorConfig.CONSUMER_AUTO_OFFSET_RESET_CONFIG, CONSUMER_AUTO_OFFSET_RESET_VALUE);
@@ -292,7 +293,7 @@ public class KafkaSourceTaskTest {
     @Test
     public void testPollNoRecords() throws Exception {
         mockConsumerInitialization();
-        EasyMock.expect(consumer.poll(25)).andReturn(new ConsumerRecords<>(Collections.EMPTY_MAP));
+        EasyMock.expect(consumer.poll(Duration.ofMillis(POLL_LOOP_TIMEOUT_MS_VALUE))).andReturn(new ConsumerRecords<>(Collections.EMPTY_MAP));
         replayAll();
 
         objectUnderTest.start(opts);
@@ -307,7 +308,7 @@ public class KafkaSourceTaskTest {
     @Test
     public void testPollRecordReturnedNoIncludeHeaders() throws Exception {
         mockConsumerInitialization();
-        EasyMock.expect(consumer.poll(25)).andReturn(createTestRecords());
+        EasyMock.expect(consumer.poll(Duration.ofMillis(POLL_LOOP_TIMEOUT_MS_VALUE))).andReturn(createTestRecords());
         replayAll();
 
         objectUnderTest.start(opts);
@@ -350,7 +351,7 @@ public class KafkaSourceTaskTest {
 
 
         // expectation for poll
-        EasyMock.expect(consumer.poll(25)).andReturn(createTestRecordsWithHeaders());
+        EasyMock.expect(consumer.poll(Duration.ofMillis(POLL_LOOP_TIMEOUT_MS_VALUE))).andReturn(createTestRecordsWithHeaders());
         replayAll();
 
         objectUnderTest.start(opts);
@@ -371,7 +372,7 @@ public class KafkaSourceTaskTest {
 
         consumer.wakeup();
         EasyMock.expectLastCall();
-        consumer.close(EasyMock.anyLong(), EasyMock.anyObject());
+        consumer.close(EasyMock.anyObject());
         EasyMock.expectLastCall();
 
         replayAll();

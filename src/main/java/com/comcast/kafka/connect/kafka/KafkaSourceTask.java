@@ -29,6 +29,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
+import java.time.Duration;
 
 
 public class KafkaSourceTask extends SourceTask {
@@ -54,7 +55,6 @@ public class KafkaSourceTask extends SourceTask {
     // Consumer
     private KafkaConsumer<byte[], byte[]> consumer;
 
-    // TODO: Maybe synchronize access to this function to ensure that stop() cant be called before the consumer is initialized? (Can stop even be called if start() hasnt returned?)
     public void start(Map<String, String> opts) {
         LOG.info("{}: task is starting.", this);
         KafkaSourceConnectorConfig sourceConnectorConfig = new KafkaSourceConnectorConfig(opts);
@@ -127,7 +127,7 @@ public class KafkaSourceTask extends SourceTask {
         ArrayList<SourceRecord> records = new ArrayList<>();
         if (poll.get()) {
             try {
-                ConsumerRecords<byte[], byte[]> krecords = consumer.poll(pollTimeout);
+                ConsumerRecords<byte[], byte[]> krecords = consumer.poll(Duration.ofMillis(pollTimeout));
                 if (LOG.isDebugEnabled()) LOG.debug("{}: Got {} records from source.", this, krecords.count());
                 for (ConsumerRecord<byte[], byte[]> krecord : krecords) {
                     Map sourcePartition = Collections.singletonMap(TOPIC_PARTITION_KEY, krecord.topic().toString().concat(":").concat(Integer.toString(krecord.partition())));
@@ -175,15 +175,15 @@ public class KafkaSourceTask extends SourceTask {
             LOG.info("{}: stop() called. Waking up consumer and shutting down", this);
             consumer.wakeup();
             if (poll.get()) {
-                LOG.debug("{}: poll() active, awaiting stopLatch before shutting down consumer", this);
+                LOG.info("{}: poll() active, awaiting for consumer to wake before attempting to shut down consumer", this);
                 try {
-                    stopLatch.await(Math.min(0, maxShutdownWait - (System.currentTimeMillis() - startWait)), TimeUnit.MILLISECONDS);
+                    stopLatch.await(Math.max(0, maxShutdownWait - (System.currentTimeMillis() - startWait)), TimeUnit.MILLISECONDS);
                 } catch (InterruptedException e){
                     LOG.warn("{}: Got InterruptedException while waiting on stopLatch", this);
                 }
             }
-            LOG.debug("{}: Shutting down consumer.", this);
-            consumer.close(Math.min(0, maxShutdownWait - (System.currentTimeMillis() - startWait)), TimeUnit.MILLISECONDS);
+            LOG.info("{}: Shutting down consumer.", this);
+            consumer.close(Duration.ofMillis(Math.max(0, maxShutdownWait - (System.currentTimeMillis() - startWait))));
         }
         LOG.info("{}: task has been stopped", this);
     }

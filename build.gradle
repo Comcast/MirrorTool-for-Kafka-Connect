@@ -16,19 +16,18 @@ plugins {
     id 'com.github.johnrengelman.shadow' version '2.0.4'
 }
 
-version = '2.0.0-SNAPSHOT'
+version = '2.0.0'
 
 
 
 dependencies {
-    def kafkaVersion = '1.1.1'
+    def kafkaVersion = '2.0.0'
     def slf4jVersion = '1.7.25'
 
     compile group: 'org.apache.kafka', name: 'connect-api', version: kafkaVersion
     compile group: 'org.apache.kafka', name: 'kafka-clients', version: kafkaVersion
     compile group: 'org.slf4j', name: 'slf4j-api', version: slf4jVersion
     compile group: 'org.slf4j', name: 'slf4j-simple', version: slf4jVersion
-
 
     // Test
     def junitVersion = '4.12'
@@ -42,10 +41,7 @@ dependencies {
     testCompile group: 'org.powermock', name: 'powermock-api-easymock', version: powermockVersion
 }
 
-// In this section you declare where to find the dependencies of your project
 repositories {
-    // Use jcenter for resolving your dependencies.
-    // You can declare any Maven/Ivy/file repository here.
     jcenter()
 }
 

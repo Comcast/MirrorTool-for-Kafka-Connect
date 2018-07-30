@@ -14,7 +14,6 @@ import org.apache.kafka.clients.admin.*;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.connect.connector.ConnectorContext;
 import org.apache.kafka.connect.errors.ConnectException;
-import org.apache.kafka.common.config.ConfigException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
