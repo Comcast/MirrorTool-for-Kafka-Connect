@@ -13,12 +13,15 @@ package com.comcast.kafka.connect.kafka;
 import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.connect.connector.ConnectorContext;
 
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.Set;
+import java.util.HashSet;
 
 import static org.junit.Assert.assertEquals;
 import static org.powermock.api.support.membermodification.MemberMatcher.method;
 import static org.powermock.api.support.membermodification.MemberModifier.suppress;
-
 
 import org.easymock.EasyMock;
 import org.junit.Before;
@@ -115,7 +118,7 @@ public class KafkaSourceConnectorTest extends EasyMockSupport {
     public void testStartCorrectConfig() throws Exception {
         PowerMock.expectNew(
                 PartitionMonitor.class,
-                new Class<?>[] { ConnectorContext.class, KafkaSourceConnectorConfig.class },
+                new Class<?>[] {ConnectorContext.class, KafkaSourceConnectorConfig.class},
                 EasyMock.anyObject(ConnectorContext.class),
                 EasyMock.anyObject(KafkaSourceConnectorConfig.class)
         ).andStubReturn(partitionMonitorMock);
@@ -132,7 +135,7 @@ public class KafkaSourceConnectorTest extends EasyMockSupport {
     public void testTaskConfigsReturns1TaskOnOneTopicPartition() throws Exception {
         PowerMock.expectNew(
                 PartitionMonitor.class,
-                new Class<?>[] { ConnectorContext.class, KafkaSourceConnectorConfig.class },
+                new Class<?>[] {ConnectorContext.class, KafkaSourceConnectorConfig.class},
                 EasyMock.anyObject(ConnectorContext.class),
                 EasyMock.anyObject(KafkaSourceConnectorConfig.class)
         ).andStubReturn(partitionMonitorMock);
@@ -166,7 +169,7 @@ public class KafkaSourceConnectorTest extends EasyMockSupport {
 
         PowerMock.expectNew(
                 PartitionMonitor.class,
-                new Class<?>[] { ConnectorContext.class, KafkaSourceConnectorConfig.class },
+                new Class<?>[] {ConnectorContext.class, KafkaSourceConnectorConfig.class},
                 EasyMock.anyObject(ConnectorContext.class),
                 EasyMock.anyObject(KafkaSourceConnectorConfig.class)
         ).andStubReturn(partitionMonitorMock);
@@ -185,7 +188,7 @@ public class KafkaSourceConnectorTest extends EasyMockSupport {
     }
 
     @Test
-    public void testTaskConfigsReturns2TasksOnTwoTopicPartitions() throws Exception{
+    public void testTaskConfigsReturns2TasksOnTwoTopicPartitions() throws Exception {
         // Default leader topic partitions to return (just one)
         stubLeaderTopicPartitions = new HashSet<>();
         LeaderTopicPartition leaderTopicPartition1 = new LeaderTopicPartition(0, SOURCE_TOPICS_VALUE, 0);
@@ -195,7 +198,7 @@ public class KafkaSourceConnectorTest extends EasyMockSupport {
 
         PowerMock.expectNew(
                 PartitionMonitor.class,
-                new Class<?>[] { ConnectorContext.class, KafkaSourceConnectorConfig.class },
+                new Class<?>[] {ConnectorContext.class, KafkaSourceConnectorConfig.class},
                 EasyMock.anyObject(ConnectorContext.class),
                 EasyMock.anyObject(KafkaSourceConnectorConfig.class)
         ).andStubReturn(partitionMonitorMock);

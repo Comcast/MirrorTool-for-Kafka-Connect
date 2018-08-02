@@ -10,7 +10,6 @@
 
 package com.comcast.kafka.connect.kafka;
 
-import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.connect.connector.Task;
@@ -19,7 +18,10 @@ import org.apache.kafka.connect.util.ConnectorUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.*;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.List;
+import java.util.ArrayList;
 import java.util.stream.Collectors;
 
 
@@ -42,7 +44,7 @@ public class KafkaSourceConnector extends SourceConnector {
 
     @Override
     public void start(Map<String, String> config) throws ConfigException {
-        LOG.info("Connector: start()");
+        LOG.info("Connector starting");
         connectorConfig = new KafkaSourceConnectorConfig(config);
         LOG.info("Starting Partition Monitor to monitor source kafka cluster partitions");
         partitionMonitor = new PartitionMonitor(context, connectorConfig);
@@ -87,9 +89,8 @@ public class KafkaSourceConnector extends SourceConnector {
     }
 
     @Override
-    public ConfigDef config () {
-        LOG.info("Connector: config()");
+    public ConfigDef config() {
         return KafkaSourceConnectorConfig.CONFIG;
     }
-    
+
 }

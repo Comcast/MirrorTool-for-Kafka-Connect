@@ -10,6 +10,7 @@
 
 package com.comcast.kafka.connect.kafka;
 
+
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -33,9 +34,18 @@ import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.modules.junit4.PowerMockRunner;
 
 import java.time.Duration;
-import java.util.*;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.Properties;
 
-import static junit.framework.TestCase.assertTrue;
+import static org.junit.Assert.assertEquals;
+
+import static com.comcast.kafka.connect.kafka.KafkaSourceTask.OFFSET_KEY;
+import static com.comcast.kafka.connect.kafka.KafkaSourceTask.TOPIC_PARTITION_KEY;
 import static org.powermock.api.easymock.PowerMock.createMock;
 import static org.powermock.api.easymock.PowerMock.replayAll;
 import static org.powermock.api.easymock.PowerMock.verifyAll;
@@ -57,24 +67,23 @@ public class KafkaSourceTaskTest {
     private Properties props;
     private KafkaSourceConnectorConfig config;
 
-    private String MAX_SHUTDOWN_WAIT_MS_VALUE = "2000";
-    private int POLL_LOOP_TIMEOUT_MS_VALUE = 25;
-    private String DESTINATION_TOPIC_PREFIX_VALUE = "test.destination";
-    private String INCLUDE_MESSAGE_HEADERS_VALUE = "false";
-    private String CONSUMER_AUTO_OFFSET_RESET_VALUE = "0";
-    private String SOURCE_BOOTSTRAP_SERVERS_VALUE = "localhost:6000";
-    private String TASK_LEADER_TOPIC_PARTITION_VALUE = "0:test.topic:1";
-    private String AUTO_OFFSET_RESET_VALUE = "latest";
-    private String SOURCE_TOPICS_WHITELIST_VALUE = "test*";
+    private static final String MAX_SHUTDOWN_WAIT_MS_VALUE = "2000";
+    private static final int POLL_LOOP_TIMEOUT_MS_VALUE = 25;
+    private static final String DESTINATION_TOPIC_PREFIX_VALUE = "test.destination";
+    private static final String INCLUDE_MESSAGE_HEADERS_VALUE = "false";
+    private static final String CONSUMER_AUTO_OFFSET_RESET_VALUE = "0";
+    private static final String SOURCE_BOOTSTRAP_SERVERS_VALUE = "localhost:6000";
+    private static final String TASK_LEADER_TOPIC_PARTITION_VALUE = "0:test.topic:1";
+    private static final String AUTO_OFFSET_RESET_VALUE = "latest";
+    private static final String SOURCE_TOPICS_WHITELIST_VALUE = "test*";
     private static final String CONSUMER_GROUP_ID_VALUE = "test-consumer-group";
 
-
-    private String FIRST_TOPIC = "test.topic";
-    private int FIRST_PARTITION = 1;
-    private long FIRST_OFFSET = 123L;
-    private String SECOND_TOPIC = "another.test.topic";
-    private int SECOND_PARTITION = 0;
-    private long SECOND_OFFSET = 456L;
+    private static final String FIRST_TOPIC = "test.topic";
+    private static final int FIRST_PARTITION = 1;
+    private static final long FIRST_OFFSET = 123L;
+    private static final String SECOND_TOPIC = "another.test.topic";
+    private static final int SECOND_PARTITION = 0;
+    private static final long SECOND_OFFSET = 456L;
 
 
     private OffsetStorageReader offsetStorageReader;
@@ -126,9 +135,9 @@ public class KafkaSourceTaskTest {
         ConnectHeaders destinationHeaders = new ConnectHeaders();
         destinationHeaders.add(header.key(), header.value(), Schema.OPTIONAL_BYTES_SCHEMA);
         ConsumerRecord<byte[], byte[]> testConsumerRecord = new ConsumerRecord<byte[], byte[]>(
-                "test.topic",
-                0,
-                0,
+                FIRST_TOPIC,
+                FIRST_PARTITION,
+                FIRST_OFFSET,
                 System.currentTimeMillis(),
                 timestampType,
                 0L,
@@ -139,7 +148,7 @@ public class KafkaSourceTaskTest {
                 headers
         );
 
-        TopicPartition topicPartition = new TopicPartition("test.topic", 0);
+        TopicPartition topicPartition = new TopicPartition(FIRST_TOPIC, FIRST_PARTITION);
         List<ConsumerRecord<byte[], byte[]>> consumerRecords = new ArrayList<>();
         consumerRecords.add(testConsumerRecord);
 
@@ -153,8 +162,8 @@ public class KafkaSourceTaskTest {
         byte testByte = 0;
         byte[] testKey = {testByte};
         byte[] testValue = {testByte};
-        ConsumerRecord<byte[], byte[]> testConsumerRecord = new ConsumerRecord<byte[], byte[]>("test.topic", 0, 0, testKey, testValue);
-        TopicPartition topicPartition = new TopicPartition("test.topic", 0);
+        ConsumerRecord<byte[], byte[]> testConsumerRecord = new ConsumerRecord<byte[], byte[]>(FIRST_TOPIC, FIRST_PARTITION, FIRST_OFFSET, testKey, testValue);
+        TopicPartition topicPartition = new TopicPartition(FIRST_TOPIC, FIRST_PARTITION);
         List<ConsumerRecord<byte[], byte[]>> consumerRecords = new ArrayList<>();
         consumerRecords.add(testConsumerRecord);
 
@@ -235,8 +244,8 @@ public class KafkaSourceTaskTest {
         Collection<TopicPartition> topicPartitions = new ArrayList<>();
         topicPartitions.add(firstTopicPartition);
         Map<Map<String, String>, Map<String, Object>> storedOffsets = Collections.singletonMap(
-                Collections.singletonMap("topic:partition", "test.topic:1"),
-                Collections.singletonMap("offset", FIRST_OFFSET)
+                Collections.singletonMap(TOPIC_PARTITION_KEY, String.format("%s:%d", FIRST_TOPIC, FIRST_PARTITION)),
+                Collections.singletonMap(OFFSET_KEY, FIRST_OFFSET)
         );
 
         EasyMock.expect(context.offsetStorageReader()).andReturn(offsetStorageReader);
@@ -267,8 +276,8 @@ public class KafkaSourceTaskTest {
         topicPartitions.add(secondTopicPartition);
         Map<TopicPartition, Long> endOffsets = Collections.singletonMap(firstTopicPartition, FIRST_OFFSET);
         Map<Map<String, String>, Map<String, Object>> storedOffsets = Collections.singletonMap(
-                Collections.singletonMap("topic:partition", "another.test.topic:0"),
-                Collections.singletonMap("offset", SECOND_OFFSET)
+                Collections.singletonMap(TOPIC_PARTITION_KEY, String.format("%s:%d", SECOND_TOPIC, SECOND_PARTITION)),
+                Collections.singletonMap(OFFSET_KEY, SECOND_OFFSET)
         );
 
         EasyMock.expect(context.offsetStorageReader()).andReturn(offsetStorageReader);
@@ -299,10 +308,10 @@ public class KafkaSourceTaskTest {
         objectUnderTest.start(opts);
         List<SourceRecord> records = objectUnderTest.poll();
 
-        assertTrue(records.size() == 0);
+        assertEquals(0, records.size());
 
         verifyAll();
-}
+    }
 
 
     @Test
@@ -315,9 +324,9 @@ public class KafkaSourceTaskTest {
         List<SourceRecord> records = objectUnderTest.poll();
 
         SourceRecord testRecord = records.get(0);
-        assertTrue(testRecord.sourcePartition().containsValue("test.topic:0"));
-        assertTrue(testRecord.sourceOffset().containsValue(0L));
-        assertTrue(testRecord.headers().size() == 0);
+        assertEquals(String.format("%s:%d", FIRST_TOPIC, FIRST_PARTITION), testRecord.sourcePartition().get(TOPIC_PARTITION_KEY));
+        assertEquals(FIRST_OFFSET, testRecord.sourceOffset().get(OFFSET_KEY));
+        assertEquals(0, testRecord.headers().size());
 
         verifyAll();
     }
@@ -358,9 +367,9 @@ public class KafkaSourceTaskTest {
         List<SourceRecord> records = objectUnderTest.poll();
 
         SourceRecord testRecord = records.get(0);
-        assertTrue(testRecord.sourcePartition().containsValue("test.topic:0"));
-        assertTrue(testRecord.sourceOffset().containsValue(0L));
-        assertTrue(testRecord.headers().size() == 1);
+        assertEquals(String.format("%s:%d", FIRST_TOPIC, FIRST_PARTITION), testRecord.sourcePartition().get(TOPIC_PARTITION_KEY));
+        assertEquals(FIRST_OFFSET, testRecord.sourceOffset().get(OFFSET_KEY));
+        assertEquals(1, testRecord.headers().size());
 
         verifyAll();
     }
