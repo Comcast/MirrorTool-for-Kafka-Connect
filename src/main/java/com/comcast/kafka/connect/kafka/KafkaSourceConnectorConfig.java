@@ -21,22 +21,26 @@ import org.apache.kafka.common.config.ConfigDef.ValidString;
 import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.Properties;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
 public class KafkaSourceConnectorConfig extends AbstractConfig {
 
-    public static final Validator NonEmptyListValidator =  new ConfigDef.Validator() {
+    private static final Validator NON_EMPTY_LIST_VALIDATOR =  new ConfigDef.Validator() {
         @Override
+        @SuppressWarnings("unchecked")
         public void ensureValid(String name, Object value) {
             if (((List<String>) value).isEmpty()) {
                 throw new ConfigException("At least one bootstrap server must be configured in " + name);
-            };
+            }
         }
     };
 
-    public static final Validator TopicWhitelistRegexValidator =  new ConfigDef.Validator() {
+    private static final Validator TOPIC_WHITELIST_REGEX_VALIDATOR =  new ConfigDef.Validator() {
         @Override
         public void ensureValid(String name, Object value) {
             getTopicWhitelistPattern((String) value);
@@ -47,9 +51,9 @@ public class KafkaSourceConnectorConfig extends AbstractConfig {
     public static final String SOURCE_PREFIX =              "source.";
     public static final String DESTINATION_PREFIX =         "destination.";
 
-    // Any config beginning with this prefix will set the config parameters for the kafka consumer used in this connector
+    // Any CONFIG beginning with this prefix will set the CONFIG parameters for the kafka consumer used in this connector
     public static final String CONSUMER_PREFIX =            "connector.consumer.";
-    // Any config beginning with this prefix will set the config parameters for the admin client used by the partition monitor
+    // Any CONFIG beginning with this prefix will set the CONFIG parameters for the admin client used by the partition monitor
     public static final String ADMIN_CLIENT_PREFIX =        "connector.admin.";
 
     public static final String TASK_PREFIX =                "task.";
@@ -57,7 +61,7 @@ public class KafkaSourceConnectorConfig extends AbstractConfig {
     // Topic partition list we send to each task. Not user configurable.
     public static final String TASK_LEADER_TOPIC_PARTITION_CONFIG = TASK_PREFIX.concat("leader.topic.partitions");
 
-    // General Connector config
+    // General Connector CONFIG
     // Topics
     public static final String SOURCE_TOPIC_WHITELIST_CONFIG =         SOURCE_PREFIX.concat("topic.whitelist");
     public static final String SOURCE_TOPIC_WHITELIST_DOC =            "Regular expressions indicating the topics to consume from the source cluster. " +
@@ -83,7 +87,7 @@ public class KafkaSourceConnectorConfig extends AbstractConfig {
     public static final String RECONFIGURE_TASKS_ON_LEADER_CHANGE_CONFIG =  "reconfigure.tasks.on.partition.leader.change";
     public static final String RECONFIGURE_TASKS_ON_LEADER_CHANGE_DOC =     "Indicates whether the partition monitor should request a task reconfiguration when partition leaders have changed";
     public static final boolean RECONFIGURE_TASKS_ON_LEADER_CHANGE_DEFAULT = false;
-    // Internal Timing Stuff
+    // Internal Connector Timing
     public static final String POLL_LOOP_TIMEOUT_MS_CONFIG =    "poll.loop.timeout.ms";
     public static final String POLL_LOOP_TIMEOUT_MS_DOC =       "Maximum amount of time to wait in each poll loop without data before cancelling the poll and returning control to the worker task";
     public static final int POLL_LOOP_TIMEOUT_MS_DEFAULT =      1000;
@@ -124,8 +128,8 @@ public class KafkaSourceConnectorConfig extends AbstractConfig {
 
 
     // Config definition
-    public static ConfigDef CONFIG = new ConfigDef()
-        .define(SOURCE_TOPIC_WHITELIST_CONFIG, Type.STRING, SOURCE_TOPIC_WHITELIST_DEFAULT, TopicWhitelistRegexValidator, Importance.HIGH, SOURCE_TOPIC_WHITELIST_DOC)
+    public static final ConfigDef CONFIG = new ConfigDef()
+        .define(SOURCE_TOPIC_WHITELIST_CONFIG, Type.STRING, SOURCE_TOPIC_WHITELIST_DEFAULT, TOPIC_WHITELIST_REGEX_VALIDATOR, Importance.HIGH, SOURCE_TOPIC_WHITELIST_DOC)
         .define(DESTINATION_TOPIC_PREFIX_CONFIG, Type.STRING, DESTINATION_TOPIC_PREFIX_DEFAULT, Importance.MEDIUM, DESTINATION_TOPIC_PREFIX_DOC)
         .define(INCLUDE_MESSAGE_HEADERS_CONFIG, Type.BOOLEAN, INCLUDE_MESSAGE_HEADERS_DEFAULT, Importance.MEDIUM, INCLUDE_MESSAGE_HEADERS_DOC)
         .define(TOPIC_LIST_TIMEOUT_MS_CONFIG, Type.INT, TOPIC_LIST_TIMEOUT_MS_DEFAULT, Importance.LOW, TOPIC_LIST_TIMEOUT_MS_DOC)
@@ -133,7 +137,7 @@ public class KafkaSourceConnectorConfig extends AbstractConfig {
         .define(RECONFIGURE_TASKS_ON_LEADER_CHANGE_CONFIG, Type.BOOLEAN, RECONFIGURE_TASKS_ON_LEADER_CHANGE_DEFAULT, Importance.MEDIUM, RECONFIGURE_TASKS_ON_LEADER_CHANGE_DOC)
         .define(POLL_LOOP_TIMEOUT_MS_CONFIG, Type.INT, POLL_LOOP_TIMEOUT_MS_DEFAULT, Importance.LOW, POLL_LOOP_TIMEOUT_MS_DOC)
         .define(MAX_SHUTDOWN_WAIT_MS_CONFIG, Type.INT, MAX_SHUTDOWN_WAIT_MS_DEFAULT, Importance.LOW, MAX_SHUTDOWN_WAIT_MS_DOC)
-        .define(SOURCE_BOOTSTRAP_SERVERS_CONFIG, Type.LIST, SOURCE_BOOTSTRAP_SERVERS_DEFAULT, NonEmptyListValidator, Importance.HIGH, SOURCE_BOOTSTRAP_SERVERS_DOC)
+        .define(SOURCE_BOOTSTRAP_SERVERS_CONFIG, Type.LIST, SOURCE_BOOTSTRAP_SERVERS_DEFAULT, NON_EMPTY_LIST_VALIDATOR, Importance.HIGH, SOURCE_BOOTSTRAP_SERVERS_DOC)
         .define(CONSUMER_MAX_POLL_RECORDS_CONFIG, Type.INT, CONSUMER_MAX_POLL_RECORDS_DEFAULT, Importance.LOW, CONSUMER_MAX_POLL_RECORDS_DOC)
         .define(CONSUMER_AUTO_OFFSET_RESET_CONFIG, Type.STRING, CONSUMER_AUTO_OFFSET_RESET_DEFAULT, CONSUMER_AUTO_OFFSET_RESET_VALIDATOR, Importance.MEDIUM, CONSUMER_AUTO_OFFSET_RESET_DOC)
         .define(CONSUMER_KEY_DESERIALIZER_CONFIG, Type.STRING, CONSUMER_KEY_DESERIALIZER_DEFAULT, Importance.LOW, CONSUMER_KEY_DESERIALIZER_DOC)
@@ -204,7 +208,9 @@ public class KafkaSourceConnectorConfig extends AbstractConfig {
         return kafkaConsumerProps;
     }
 
-    public Pattern getTopicWhitelistPattern() { return getTopicWhitelistPattern(getString(SOURCE_TOPIC_WHITELIST_CONFIG)); }
+    public Pattern getTopicWhitelistPattern() {
+        return getTopicWhitelistPattern(getString(SOURCE_TOPIC_WHITELIST_CONFIG));
+    }
 
     // Returns a java regex pattern that can be used to match kafka topics
     private static Pattern getTopicWhitelistPattern(String rawRegex) {
@@ -212,12 +218,12 @@ public class KafkaSourceConnectorConfig extends AbstractConfig {
                 .trim()
                 .replace(',', '|')
                 .replace(" ", "")
-                .replaceAll("^[\"']+","")
-                .replaceAll("[\"']+$",""); // property files may bring quotes
+                .replaceAll("^[\"']+", "")
+                .replaceAll("[\"']+$", ""); // property files may bring quotes
         try {
             return Pattern.compile(regex);
         } catch (PatternSyntaxException e) {
-            throw new ConfigException(regex + " is an invalid regex for config " + SOURCE_TOPIC_WHITELIST_CONFIG);
+            throw new ConfigException(regex + " is an invalid regex for CONFIG " + SOURCE_TOPIC_WHITELIST_CONFIG);
         }
     }
 

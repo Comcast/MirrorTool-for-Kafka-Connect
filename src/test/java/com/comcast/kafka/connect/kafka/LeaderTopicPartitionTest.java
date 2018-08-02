@@ -12,7 +12,6 @@ package com.comcast.kafka.connect.kafka;
 
 
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.After;
 import org.junit.runner.RunWith;
@@ -53,7 +52,7 @@ public class LeaderTopicPartitionTest {
         objectUnderTest = null;
     }
 
-    @Test(expected=IllegalArgumentException.class)
+    @Test(expected = IllegalArgumentException.class)
     public void testNullTopicName() {
         objectUnderTest = new LeaderTopicPartition(
                 LEADER_ID,
@@ -67,7 +66,7 @@ public class LeaderTopicPartitionTest {
         assertEquals(LEADER_TOPIC_PARTITION, objectUnderTest.toString());
     }
 
-    @Test(expected=IllegalArgumentException.class)
+    @Test(expected = IllegalArgumentException.class)
     public void testFromInvalidString() {
         String invalidString = "test";
         LeaderTopicPartition.fromString(invalidString);

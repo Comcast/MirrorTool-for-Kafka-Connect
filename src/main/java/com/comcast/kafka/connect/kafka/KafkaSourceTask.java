@@ -24,7 +24,12 @@ import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.*;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -34,8 +39,8 @@ import java.time.Duration;
 
 public class KafkaSourceTask extends SourceTask {
     private static final Logger LOG = LoggerFactory.getLogger(KafkaSourceTask.class);
-    private static final String TOPIC_PARTITION_KEY = "topic:partition";
-    private static final String OFFSET_KEY = "offset";
+    public static final String TOPIC_PARTITION_KEY = "topic:partition";
+    public static final String OFFSET_KEY = "offset";
 
     // Used to ensure we can be nice and call consumer.close() on shutdown
     private final CountDownLatch stopLatch = new CountDownLatch(1);
@@ -71,8 +76,8 @@ public class KafkaSourceTask extends SourceTask {
             .collect(Collectors.toList());
         // retrieve the existing offsets (if any) for the configured partitions
         List<Map<String, String>> offsetLookupPartitions = leaderTopicPartitions.stream()
-                .map(leaderTopicPartition -> Collections.singletonMap(TOPIC_PARTITION_KEY, leaderTopicPartition.toTopicPartitionString()))
-                .collect(Collectors.toList());
+            .map(leaderTopicPartition -> Collections.singletonMap(TOPIC_PARTITION_KEY, leaderTopicPartition.toTopicPartitionString()))
+            .collect(Collectors.toList());
         Map<String, Long> topicPartitionStringsOffsets = context.offsetStorageReader().offsets(offsetLookupPartitions)
             .entrySet()
             .stream()
@@ -113,7 +118,7 @@ public class KafkaSourceTask extends SourceTask {
         List<TopicPartition> topicPartitionsToAssign = new ArrayList<>(topicPartitionOffsets.keySet());
         consumer.assign(topicPartitionsToAssign);
         // Seek to desired offset for each partition
-        topicPartitionOffsets.entrySet().forEach(e -> consumer.seek(e.getKey(), e.getValue()));
+        topicPartitionOffsets.forEach((key, value) -> consumer.seek(key, value));
     }
 
 
@@ -130,16 +135,16 @@ public class KafkaSourceTask extends SourceTask {
                 ConsumerRecords<byte[], byte[]> krecords = consumer.poll(Duration.ofMillis(pollTimeout));
                 if (LOG.isDebugEnabled()) LOG.debug("{}: Got {} records from source.", this, krecords.count());
                 for (ConsumerRecord<byte[], byte[]> krecord : krecords) {
-                    Map sourcePartition = Collections.singletonMap(TOPIC_PARTITION_KEY, krecord.topic().toString().concat(":").concat(Integer.toString(krecord.partition())));
-                    Map sourceOffset = Collections.singletonMap(OFFSET_KEY, krecord.offset());
+                    Map<String, String> sourcePartition = Collections.singletonMap(TOPIC_PARTITION_KEY, krecord.topic().concat(":").concat(Integer.toString(krecord.partition())));
+                    Map<String, Long> sourceOffset = Collections.singletonMap(OFFSET_KEY, krecord.offset());
                     String destinationTopic = topicPrefix.concat(krecord.topic());
                     if (LOG.isDebugEnabled()) {
                         LOG.trace(
                                 "Task: sourceTopic:{} sourcePartition:{} sourceOffSet:{} destinationTopic:{}, key:{}, valueSize:{}",
-                                krecord.topic(), krecord.partition(), krecord.offset(), destinationTopic, (krecord.key() != null) ? krecord.key().toString() : null, krecord.serializedValueSize()
+                                krecord.topic(), krecord.partition(), krecord.offset(), destinationTopic, krecord.key(), krecord.serializedValueSize()
                         );
                     }
-                    if (includeHeaders){
+                    if (includeHeaders) {
                         // Mapping from source type: org.apache.kafka.common.header.Headers, to destination type: org.apache.kafka.connect.Headers
                         Headers sourceHeaders = krecord.headers();
                         ConnectHeaders destinationHeaders = new ConnectHeaders();
@@ -178,7 +183,7 @@ public class KafkaSourceTask extends SourceTask {
                 LOG.info("{}: poll() active, awaiting for consumer to wake before attempting to shut down consumer", this);
                 try {
                     stopLatch.await(Math.max(0, maxShutdownWait - (System.currentTimeMillis() - startWait)), TimeUnit.MILLISECONDS);
-                } catch (InterruptedException e){
+                } catch (InterruptedException e) {
                     LOG.warn("{}: Got InterruptedException while waiting on stopLatch", this);
                 }
             }
@@ -187,9 +192,6 @@ public class KafkaSourceTask extends SourceTask {
         }
         LOG.info("{}: task has been stopped", this);
     }
-
-
-
     @Override
     public String version() {
         return new Version().version();

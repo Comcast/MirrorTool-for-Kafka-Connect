@@ -10,7 +10,10 @@
 
 package com.comcast.kafka.connect.kafka;
 
-import org.apache.kafka.clients.admin.*;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.ListTopicsOptions;
+import org.apache.kafka.clients.admin.DescribeTopicsOptions;
+import org.apache.kafka.clients.admin.TopicDescription;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.connect.connector.ConnectorContext;
 import org.apache.kafka.connect.errors.ConnectException;
@@ -18,8 +21,15 @@ import org.apache.kafka.connect.errors.ConnectException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.*;
-import java.util.concurrent.*;
+import java.util.Map;
+import java.util.Set;
+import java.util.HashSet;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.regex.Pattern;
@@ -48,11 +58,11 @@ public class PartitionMonitor {
     PartitionMonitor(ConnectorContext connectorContext, KafkaSourceConnectorConfig sourceConnectorConfig) {
         topicWhitelistPattern = sourceConnectorConfig.getTopicWhitelistPattern();
         reconfigureTasksOnLeaderChange = sourceConnectorConfig.getBoolean(KafkaSourceConnectorConfig.RECONFIGURE_TASKS_ON_LEADER_CHANGE_CONFIG);
-        topicPollIntervalMs = sourceConnectorConfig.getInt(KafkaSourceConnectorConfig.TOPIC_LIST_POLL_INTERVAL_MS_CONFIG);;
-        maxShutdownWaitMs = sourceConnectorConfig.getInt(KafkaSourceConnectorConfig.MAX_SHUTDOWN_WAIT_MS_CONFIG);;
-        topicRequestTimeoutMs = sourceConnectorConfig.getInt(KafkaSourceConnectorConfig.TOPIC_LIST_TIMEOUT_MS_CONFIG);;
+        topicPollIntervalMs = sourceConnectorConfig.getInt(KafkaSourceConnectorConfig.TOPIC_LIST_POLL_INTERVAL_MS_CONFIG);
+        maxShutdownWaitMs = sourceConnectorConfig.getInt(KafkaSourceConnectorConfig.MAX_SHUTDOWN_WAIT_MS_CONFIG);
+        topicRequestTimeoutMs = sourceConnectorConfig.getInt(KafkaSourceConnectorConfig.TOPIC_LIST_TIMEOUT_MS_CONFIG);
         partitionMonitorClient = AdminClient.create(sourceConnectorConfig.getAdminClientProperties());
-        // Thread to periodically poll the kafka cluster for changes in topics or partititons
+        // Thread to periodically poll the kafka cluster for changes in topics or partitions
         pollThread = new Runnable() {
             @Override
             public void run() {
@@ -141,7 +151,7 @@ public class PartitionMonitor {
         LOG.info("Shutdown called.");
         long startWait = System.currentTimeMillis();
         shutdown.set(true);
-        partitionMonitorClient.close( maxShutdownWaitMs - (System.currentTimeMillis() - startWait), TimeUnit.MILLISECONDS);
+        partitionMonitorClient.close(maxShutdownWaitMs - (System.currentTimeMillis() - startWait), TimeUnit.MILLISECONDS);
         // Cancel our scheduled task, but wait for an existing task to complete if running
         pollHandle.cancel(false);
         // Ask nicely to shut down the partition monitor executor service if it hasn't already
@@ -176,7 +186,7 @@ public class PartitionMonitor {
         return retrievedTopicDescriptions.values().stream()
             .map(topicDescription ->
                 topicDescription.partitions().stream()
-                .map(partitionInfo -> new LeaderTopicPartition(partitionInfo.leader().id(), topicDescription.name(), partitionInfo.partition()))
+                    .map(partitionInfo -> new LeaderTopicPartition(partitionInfo.leader().id(), topicDescription.name(), partitionInfo.partition()))
             )
             .flatMap(Function.identity())
             .collect(Collectors.toSet());
