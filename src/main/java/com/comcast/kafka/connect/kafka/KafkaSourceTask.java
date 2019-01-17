@@ -13,6 +13,8 @@ package com.comcast.kafka.connect.kafka;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.consumer.OffsetAndMetadata;
+import org.apache.kafka.clients.consumer.OffsetResetStrategy;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.header.Header;
@@ -33,6 +35,7 @@ import java.util.Collections;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.time.Duration;
 
@@ -102,12 +105,16 @@ public class KafkaSourceTask extends SourceTask {
         if (topicPartitionsWithUnknownOffset.size() > 0) {
             Map<TopicPartition, Long> defaultOffsets;
             LOG.info("The following partitions do not have existing offset data: {}", topicPartitionsWithUnknownOffset);
-            if (unknownOffsetResetPosition.equals("earliest")) {
+            if (unknownOffsetResetPosition.equals(OffsetResetStrategy.EARLIEST.toString().toLowerCase())) {
                 LOG.info("Using earliest offsets for partitions without existing offset data.");
                 defaultOffsets = consumer.beginningOffsets(topicPartitionsWithUnknownOffset);
-            } else if (unknownOffsetResetPosition.equals("latest")) {
+            } else if (unknownOffsetResetPosition.equals(OffsetResetStrategy.LATEST.toString().toLowerCase())) {
                 LOG.info("Using latest offsets for partitions without existing offset data.");
                 defaultOffsets = consumer.endOffsets(topicPartitionsWithUnknownOffset);
+            } else if (unknownOffsetResetPosition.equals(OffsetResetStrategy.NONE.toString().toLowerCase())) {
+                LOG.info("Will try to use existing consumer group offsets for partitions.");
+                defaultOffsets = topicPartitionsWithUnknownOffset.stream()
+                        .collect(Collectors.toMap(Function.identity(), tp -> consumer.committed(tp).offset()));
             } else {
                 LOG.warn("Config value {}, is set to an unknown value: {}. Partitions without existing offset data will not be consumed.", KafkaSourceConnectorConfig.CONSUMER_AUTO_OFFSET_RESET_CONFIG, unknownOffsetResetPosition);
                 defaultOffsets = new HashMap<>();
