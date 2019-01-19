@@ -41,9 +41,11 @@ Configuration Parameter | Example | Description
 ----------------------- | ------- | -----------
 **source.bootstrap.servers** | source.broker1:9092,source.broker2:9092 | **Mandatory.** Comma separated list of boostrap servers for the source Kafka cluster
 **source.topic.whitelist** | topic, topic-prefix* | Java regular expression to match topics to mirror. For convenience, comma (',') is interpreted as the regex-choice symbol ('|').
-**source.auto.offset.reset** | earliest | If there is no stored offset for a partition, indicates where to start consuming from. Options are _"earliest"_ or _"latest"_. Default: _earliest_
+**source.auto.offset.reset** | earliest | If there is no stored offset* for a partition, indicates where to start consuming from. Options are _"earliest"_,  _"latest"_, or _"none"_. Default: _earliest_
 **source.group.id** | kafka-connect | Group ID used when writing offsets back to source cluster (for offset lag tracking)
 **destination.topics.prefix** | aggregate. | Prefix to add to source topic names when determining the Kafka topic to publish data to
+
+* "*Stored offset*" here does not mean the stored consumer group offset, rather the stored offset within the Kafka Connect `offset.storage.topic` topic. If you want to start the connector from an existing consumer group, then set `source.auto.offset.reset` to `none`, and update `source.group.id` accordingly.
 
 ## Advanced Options
 
@@ -80,7 +82,7 @@ For cases where the configuration for the KafkaConsumer and AdminClient diverges
     "connector.class": "com.comcast.kafka.connect.kafka.KafkaSourceConnector", // The full class name of this connector
     "source.bootstrap.servers": "kafka.bootstrap.server1:9092,kafka.bootstrap.server2:9093", // Kafka boostrap servers for source cluster
     "source.topic.whitelist": "test.topic.*", // Mirror topics matching this regex
-    "source.auto.offset.reset": "earliest", // For partitions without existing offsets stored, start at the tail of the partition
+    "source.auto.offset.reset": "earliest", // For partitions without existing offsets stored, start at the head of the partition
     "source.group.id": "kafka-connect-testing", // Use this group ID when commiting offsets to the source cluster
     "destination.topics.prefix": "aggregate.", // Add "aggregate." as a prefix to the original topic name when sending to the destination cluster
     "connector.consumer.reconnect.backoff.max.ms": "10000" // Override the default consumer setting "reconnect.backoff.max.ms"

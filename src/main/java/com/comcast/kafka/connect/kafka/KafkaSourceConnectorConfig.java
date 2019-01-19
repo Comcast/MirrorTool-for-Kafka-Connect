@@ -12,6 +12,7 @@ package com.comcast.kafka.connect.kafka;
 
 import org.apache.kafka.clients.CommonClientConfigs;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.OffsetResetStrategy;
 import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.common.config.ConfigDef.Importance;
@@ -107,9 +108,12 @@ public class KafkaSourceConnectorConfig extends AbstractConfig {
     public static final String CONSUMER_MAX_POLL_RECORDS_DOC =              "Maximum number of records to return from each poll of the consumer";
     public static final int CONSUMER_MAX_POLL_RECORDS_DEFAULT =             500;
     public static final String CONSUMER_AUTO_OFFSET_RESET_CONFIG =          SOURCE_PREFIX.concat(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG);
-    public static final String CONSUMER_AUTO_OFFSET_RESET_DOC =             "If there is no stored offset for a partition, where to reset from [earliest|latest].";
+    public static final String CONSUMER_AUTO_OFFSET_RESET_DOC =             "If there is no stored offset for a partition, where to reset from [earliest|latest|none].";
     public static final String CONSUMER_AUTO_OFFSET_RESET_DEFAULT =         "earliest";
-    public static final ValidString CONSUMER_AUTO_OFFSET_RESET_VALIDATOR =  ConfigDef.ValidString.in("earliest", "latest");
+    public static final ValidString CONSUMER_AUTO_OFFSET_RESET_VALIDATOR =  ConfigDef.ValidString.in(
+                                                                                OffsetResetStrategy.EARLIEST.toString().toLowerCase(),
+                                                                                OffsetResetStrategy.LATEST.toString().toLowerCase(),
+                                                                                OffsetResetStrategy.NONE.toString().toLowerCase());
     public static final String CONSUMER_KEY_DESERIALIZER_CONFIG =           SOURCE_PREFIX.concat(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG);
     public static final String CONSUMER_KEY_DESERIALIZER_DOC =              "Key deserializer to use for the kafka consumers connecting to the source cluster.";
     public static final String CONSUMER_KEY_DESERIALIZER_DEFAULT =          ByteArrayDeserializer.class.getName();
