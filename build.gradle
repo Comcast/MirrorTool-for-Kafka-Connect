@@ -24,9 +24,9 @@ dependencies {
     def kafkaVersion = '2.0.0'
     def slf4jVersion = '1.7.25'
 
-    compile group: 'org.apache.kafka', name: 'connect-api', version: kafkaVersion
-    compile group: 'org.apache.kafka', name: 'kafka-clients', version: kafkaVersion
-    compile group: 'org.slf4j', name: 'slf4j-api', version: slf4jVersion
+    compileOnly group: 'org.apache.kafka', name: 'connect-api', version: kafkaVersion
+    compileOnly group: 'org.apache.kafka', name: 'kafka-clients', version: kafkaVersion
+    compileOnly group: 'org.slf4j', name: 'slf4j-api', version: slf4jVersion
     compile group: 'org.slf4j', name: 'slf4j-simple', version: slf4jVersion
 
     // Test
@@ -34,6 +34,8 @@ dependencies {
     def easymockVersion = '3.6'
     def powermockVersion = '2.0.0-beta.5'
 
+    testCompile group: 'org.apache.kafka', name: 'connect-api', version: kafkaVersion
+    testCompile group: 'org.apache.kafka', name: 'kafka-clients', version: kafkaVersion
     testCompile group: 'junit', name: 'junit', version: junitVersion
     testCompile group: 'org.easymock', name: 'easymock', version: easymockVersion
     testCompile group: 'org.powermock', name: 'powermock-core', version: powermockVersion
