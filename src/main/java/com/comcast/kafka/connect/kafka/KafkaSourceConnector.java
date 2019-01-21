@@ -24,73 +24,67 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.stream.Collectors;
 
-
 /**
- * KafkaConnector is a Kafka Connect Connector implementation that generates tasks
- * to ingest messages from a source kafka cluster
+ * KafkaConnector is a Kafka Connect Connector implementation that generates
+ * tasks to ingest messages from a source kafka cluster
  */
 
 public class KafkaSourceConnector extends SourceConnector {
 
-    private static final Logger LOG = LoggerFactory.getLogger(KafkaSourceConnector.class);
-    private KafkaSourceConnectorConfig connectorConfig;
+  private static final Logger logger = LoggerFactory.getLogger(KafkaSourceConnector.class);
+  private KafkaSourceConnectorConfig connectorConfig;
 
-    private PartitionMonitor partitionMonitor;
+  private PartitionMonitor partitionMonitor;
 
-    @Override
-    public String version() {
-        return Version.version();
+  @Override
+  public String version() {
+    return Version.version();
+  }
+
+  @Override
+  public void start(Map<String, String> config) throws ConfigException {
+    logger.info("Connector starting");
+    connectorConfig = new KafkaSourceConnectorConfig(config);
+    logger.info("Starting Partition Monitor to monitor source kafka cluster partitions");
+    partitionMonitor = new PartitionMonitor(context, connectorConfig);
+    partitionMonitor.start();
+  }
+
+  @Override
+  public Class<? extends Task> taskClass() {
+    return KafkaSourceTask.class;
+  }
+
+  @Override
+  public List<Map<String, String>> taskConfigs(int maxTasks) {
+    List<String> leaderTopicPartitions = partitionMonitor.getCurrentLeaderTopicPartitions().stream()
+        .map(LeaderTopicPartition::toString).sorted() // Potential task performance/overhead improvement by roughly
+                                                      // grouping tasks and leaders
+        .collect(Collectors.toList());
+    int taskCount = Math.min(maxTasks, leaderTopicPartitions.size());
+    if (taskCount < 1) {
+      logger.warn("No tasks to start.");
+      return new ArrayList<>();
     }
+    return ConnectorUtils.groupPartitions(leaderTopicPartitions, taskCount).stream().map(leaderTopicPartitionsGroup -> {
+      Map<String, String> taskConfig = new HashMap<>();
+      taskConfig.putAll(connectorConfig.allAsStrings());
+      taskConfig.put(KafkaSourceConnectorConfig.TASK_LEADER_TOPIC_PARTITION_CONFIG,
+          String.join(",", leaderTopicPartitionsGroup));
+      return taskConfig;
+    }).collect(Collectors.toList());
+  }
 
-    @Override
-    public void start(Map<String, String> config) throws ConfigException {
-        LOG.info("Connector starting");
-        connectorConfig = new KafkaSourceConnectorConfig(config);
-        LOG.info("Starting Partition Monitor to monitor source kafka cluster partitions");
-        partitionMonitor = new PartitionMonitor(context, connectorConfig);
-        partitionMonitor.start();
-    }
+  @Override
+  public void stop() {
+    logger.info("Connector received stop(). Cleaning Up.");
+    partitionMonitor.shutdown();
+    logger.info("Connector stopped.");
+  }
 
-
-    @Override
-    public Class<? extends Task> taskClass() {
-        return KafkaSourceTask.class;
-    }
-
-
-    @Override
-    public List<Map<String, String>> taskConfigs(int maxTasks) {
-        List<String> leaderTopicPartitions = partitionMonitor.getCurrentLeaderTopicPartitions()
-            .stream()
-            .map(LeaderTopicPartition::toString)
-            .sorted() // Potential task performance/overhead improvement by roughly grouping tasks and leaders
-            .collect(Collectors.toList());
-        int taskCount = Math.min(maxTasks, leaderTopicPartitions.size());
-        if (taskCount < 1) {
-            LOG.warn("No tasks to start.");
-            return new ArrayList<>();
-        }
-        return ConnectorUtils.groupPartitions(leaderTopicPartitions, taskCount)
-            .stream()
-            .map(leaderTopicPartitionsGroup -> {
-                Map<String, String> taskConfig = new HashMap<>();
-                taskConfig.putAll(connectorConfig.allAsStrings());
-                taskConfig.put(KafkaSourceConnectorConfig.TASK_LEADER_TOPIC_PARTITION_CONFIG, String.join(",", leaderTopicPartitionsGroup));
-                return taskConfig;
-            })
-            .collect(Collectors.toList());
-    }
-
-    @Override
-    public void stop() {
-        LOG.info("Connector received stop(). Cleaning Up.");
-        partitionMonitor.shutdown();
-        LOG.info("Connector stopped.");
-    }
-
-    @Override
-    public ConfigDef config() {
-        return KafkaSourceConnectorConfig.CONFIG;
-    }
+  @Override
+  public ConfigDef config() {
+    return KafkaSourceConnectorConfig.CONFIG;
+  }
 
 }
