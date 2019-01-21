@@ -2,6 +2,10 @@
 
 A Kafka Source Connector for [Kafka Connect](https://kafka.apache.org/documentation/#connect). Mirror topics from a source Kafka cluster into your destination Kafka cluster.
 
+## Downloads
+
+You can grab a pre-built jar on the [Releases](https://github.com/Comcast/MirrorTool-for-Kafka-Connect/releases) page.
+
 ## Why
 
 The aim of this connector is to enable [MirrorMaker](https://cwiki.apache.org/confluence/pages/viewpage.action?pageId=27846330)-like functionality within the Kafka Connect framework.
@@ -23,9 +27,9 @@ At Comcast, we have seen two key benefits to using MirrorTool over MirrorMaker:
 
 ## Build
 
-Output a fat jar to `build/libs/MirrorTool-[version]-all.jar` by running:
+Build a plugin jar to `build/libs/MirrorTool-[version].jar` by running:
 
-`gradle shadowJar`
+`./gradlew build`
 
 Copy the resulting jar file into your Kafka Connect plugin directory.
 
