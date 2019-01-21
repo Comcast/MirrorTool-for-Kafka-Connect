@@ -36,195 +36,179 @@ import org.powermock.api.easymock.PowerMock;
 import org.easymock.EasyMockSupport;
 
 @RunWith(PowerMockRunner.class)
-@PrepareForTest({KafkaSourceConnector.class, PartitionMonitor.class})
+@PrepareForTest({ KafkaSourceConnector.class, PartitionMonitor.class })
 @PowerMockIgnore("javax.management.*")
 public class KafkaSourceConnectorTest extends EasyMockSupport {
 
-    private PartitionMonitor partitionMonitorMock;
-    private ConnectorContext connectorContextMock;
+  private static final String SOURCE_TOPICS_VALUE = "test.topic";
+  private static final String SOURCE_BOOTSTRAP_SERVERS_CONFIG = "localhost:6000";
+  private static final String POLL_LOOP_TIMEOUT_MS_VALUE = "2000";
+  private static final String TOPIC_LIST_TIMEOUT_MS_VALUE = "5000";
+  private static final String CONSUMER_GROUP_ID_VALUE = "test-consumer-group";
 
-    private Set<LeaderTopicPartition> stubLeaderTopicPartitions;
+  private PartitionMonitor partitionMonitorMock;
+  private ConnectorContext connectorContextMock;
+  private Set<LeaderTopicPartition> stubLeaderTopicPartitions;
+  private KafkaSourceConnector connector;
+  private Map<String, String> sourceProperties;
 
-    private KafkaSourceConnector connector;
+  @Before
+  public void setUp() throws Exception {
+    connector = new KafkaSourceConnector();
+    connectorContextMock = PowerMock.createMock(ConnectorContext.class);
+    partitionMonitorMock = PowerMock.createMock(PartitionMonitor.class);
+    connector.initialize(connectorContextMock);
 
-    private Map<String, String> sourceProperties;
+    // Default test settings
+    sourceProperties = new HashMap<>();
+    sourceProperties.put(KafkaSourceConnectorConfig.SOURCE_TOPIC_WHITELIST_CONFIG, SOURCE_TOPICS_VALUE);
+    sourceProperties.put(KafkaSourceConnectorConfig.SOURCE_BOOTSTRAP_SERVERS_CONFIG, SOURCE_BOOTSTRAP_SERVERS_CONFIG);
+    sourceProperties.put(KafkaSourceConnectorConfig.POLL_LOOP_TIMEOUT_MS_CONFIG, POLL_LOOP_TIMEOUT_MS_VALUE);
+    sourceProperties.put(KafkaSourceConnectorConfig.TOPIC_LIST_TIMEOUT_MS_CONFIG, TOPIC_LIST_TIMEOUT_MS_VALUE);
+    sourceProperties.put(KafkaSourceConnectorConfig.CONSUMER_GROUP_ID_CONFIG, CONSUMER_GROUP_ID_VALUE);
 
-    private static final String SOURCE_TOPICS_VALUE = "test.topic";
-    private static final String SOURCE_BOOTSTRAP_SERVERS_CONFIG = "localhost:6000";
-    private static final String POLL_LOOP_TIMEOUT_MS_VALUE = "2000";
-    private static final String TOPIC_LIST_TIMEOUT_MS_VALUE = "5000";
-    private static final String CONSUMER_GROUP_ID_VALUE = "test-consumer-group";
+    // Default leader topic partitions to return (just one)
+    stubLeaderTopicPartitions = new HashSet<>();
+    LeaderTopicPartition leaderTopicPartition = new LeaderTopicPartition(0, SOURCE_TOPICS_VALUE, 0);
+    stubLeaderTopicPartitions.add(leaderTopicPartition);
+  }
 
-    @Before
-    public void setUp() throws Exception {
-        connector = new KafkaSourceConnector();
-        connectorContextMock = PowerMock.createMock(ConnectorContext.class);
-        partitionMonitorMock = PowerMock.createMock(PartitionMonitor.class);
-        connector.initialize(connectorContextMock);
+  @After
+  public void tearDown() {
+  }
 
-        // Default test settings
-        sourceProperties = new HashMap<>();
-        sourceProperties.put(KafkaSourceConnectorConfig.SOURCE_TOPIC_WHITELIST_CONFIG, SOURCE_TOPICS_VALUE);
-        sourceProperties.put(KafkaSourceConnectorConfig.SOURCE_BOOTSTRAP_SERVERS_CONFIG, SOURCE_BOOTSTRAP_SERVERS_CONFIG);
-        sourceProperties.put(KafkaSourceConnectorConfig.POLL_LOOP_TIMEOUT_MS_CONFIG, POLL_LOOP_TIMEOUT_MS_VALUE);
-        sourceProperties.put(KafkaSourceConnectorConfig.TOPIC_LIST_TIMEOUT_MS_CONFIG, TOPIC_LIST_TIMEOUT_MS_VALUE);
-        sourceProperties.put(KafkaSourceConnectorConfig.CONSUMER_GROUP_ID_CONFIG, CONSUMER_GROUP_ID_VALUE);
+  @Test(expected = ConfigException.class)
+  public void testStartMissingBootstrapServers() {
+    suppress(method(PartitionMonitor.class, "start"));
+    PowerMock.replayAll();
 
-        // Default leader topic partitions to return (just one)
-        stubLeaderTopicPartitions = new HashSet<>();
-        LeaderTopicPartition leaderTopicPartition = new LeaderTopicPartition(0, SOURCE_TOPICS_VALUE, 0);
-        stubLeaderTopicPartitions.add(leaderTopicPartition);
-    }
+    sourceProperties.remove(KafkaSourceConnectorConfig.SOURCE_BOOTSTRAP_SERVERS_CONFIG);
+    connector.start(sourceProperties);
 
-    @After
-    public void tearDown() {
-    }
+    PowerMock.verifyAll();
+  }
 
+  @Test(expected = ConfigException.class)
+  public void testStartBlankBootstrapServers() {
+    suppress(method(PartitionMonitor.class, "start"));
+    PowerMock.replayAll();
 
-    @Test(expected = ConfigException.class)
-    public void testStartMissingBootstrapServers() {
-        suppress(method(PartitionMonitor.class, "start"));
-        PowerMock.replayAll();
+    sourceProperties.put(KafkaSourceConnectorConfig.SOURCE_BOOTSTRAP_SERVERS_CONFIG, "");
+    connector.start(sourceProperties);
 
-        sourceProperties.remove(KafkaSourceConnectorConfig.SOURCE_BOOTSTRAP_SERVERS_CONFIG);
-        connector.start(sourceProperties);
+    PowerMock.verifyAll();
+  }
 
-        PowerMock.verifyAll();
-    }
+  @Test(expected = ConfigException.class)
+  public void testStartTopicWhitelistMissing() {
+    suppress(method(PartitionMonitor.class, "start"));
+    replayAll();
 
-    @Test(expected = ConfigException.class)
-    public void testStartBlankBootstrapServers() {
-        suppress(method(PartitionMonitor.class, "start"));
-        PowerMock.replayAll();
+    sourceProperties.remove(KafkaSourceConnectorConfig.SOURCE_TOPIC_WHITELIST_CONFIG);
+    connector.start(sourceProperties);
 
-        sourceProperties.put(KafkaSourceConnectorConfig.SOURCE_BOOTSTRAP_SERVERS_CONFIG, "");
-        connector.start(sourceProperties);
+    PowerMock.verifyAll();
+  }
 
-        PowerMock.verifyAll();
-    }
+  @Test
+  public void testStartCorrectConfig() throws Exception {
+    PowerMock
+        .expectNew(PartitionMonitor.class, new Class<?>[] { ConnectorContext.class, KafkaSourceConnectorConfig.class },
+            EasyMock.anyObject(ConnectorContext.class), EasyMock.anyObject(KafkaSourceConnectorConfig.class))
+        .andStubReturn(partitionMonitorMock);
+    partitionMonitorMock.start();
+    PowerMock.expectLastCall().andVoid();
+    PowerMock.replayAll();
 
-    @Test(expected = ConfigException.class)
-    public void testStartTopicWhitelistMissing() {
-        suppress(method(PartitionMonitor.class, "start"));
-        replayAll();
+    connector.start(sourceProperties);
 
-        sourceProperties.remove(KafkaSourceConnectorConfig.SOURCE_TOPIC_WHITELIST_CONFIG);
-        connector.start(sourceProperties);
+    verifyAll();
+  }
 
-        PowerMock.verifyAll();
-    }
+  @Test
+  public void testTaskConfigsReturns1TaskOnOneTopicPartition() throws Exception {
+    PowerMock
+        .expectNew(PartitionMonitor.class, new Class<?>[] { ConnectorContext.class, KafkaSourceConnectorConfig.class },
+            EasyMock.anyObject(ConnectorContext.class), EasyMock.anyObject(KafkaSourceConnectorConfig.class))
+        .andStubReturn(partitionMonitorMock);
+    partitionMonitorMock.start();
+    PowerMock.expectLastCall().andVoid();
+    EasyMock.expect(partitionMonitorMock.getCurrentLeaderTopicPartitions()).andReturn(stubLeaderTopicPartitions);
+    PowerMock.replayAll();
 
-    @Test
-    public void testStartCorrectConfig() throws Exception {
-        PowerMock.expectNew(
-                PartitionMonitor.class,
-                new Class<?>[] {ConnectorContext.class, KafkaSourceConnectorConfig.class},
-                EasyMock.anyObject(ConnectorContext.class),
-                EasyMock.anyObject(KafkaSourceConnectorConfig.class)
-        ).andStubReturn(partitionMonitorMock);
-        partitionMonitorMock.start();
-        PowerMock.expectLastCall().andVoid();
-        PowerMock.replayAll();
+    connector.start(sourceProperties);
+    List<Map<String, String>> taskConfigs = connector.taskConfigs(2);
 
-        connector.start(sourceProperties);
+    assertEquals(1, taskConfigs.size());
+    assertEquals("0:test.topic:0", taskConfigs.get(0).get("task.leader.topic.partitions"));
+    assertEquals(SOURCE_TOPICS_VALUE, taskConfigs.get(0).get(KafkaSourceConnectorConfig.SOURCE_TOPIC_WHITELIST_CONFIG));
+    assertEquals(SOURCE_BOOTSTRAP_SERVERS_CONFIG,
+        taskConfigs.get(0).get(KafkaSourceConnectorConfig.SOURCE_BOOTSTRAP_SERVERS_CONFIG));
 
-        verifyAll();
-    }
+    verifyAll();
+  }
 
-    @Test
-    public void testTaskConfigsReturns1TaskOnOneTopicPartition() throws Exception {
-        PowerMock.expectNew(
-                PartitionMonitor.class,
-                new Class<?>[] {ConnectorContext.class, KafkaSourceConnectorConfig.class},
-                EasyMock.anyObject(ConnectorContext.class),
-                EasyMock.anyObject(KafkaSourceConnectorConfig.class)
-        ).andStubReturn(partitionMonitorMock);
-        partitionMonitorMock.start();
-        PowerMock.expectLastCall().andVoid();
-        EasyMock.expect(partitionMonitorMock.getCurrentLeaderTopicPartitions()).andReturn(stubLeaderTopicPartitions);
-        PowerMock.replayAll();
+  @Test
+  public void testTaskConfigsReturns1TaskOnTwoTopicPartitions() throws Exception {
+    // Default leader topic partitions to return (just one)
+    stubLeaderTopicPartitions = new HashSet<>();
+    LeaderTopicPartition leaderTopicPartition1 = new LeaderTopicPartition(0, SOURCE_TOPICS_VALUE, 0);
+    stubLeaderTopicPartitions.add(leaderTopicPartition1);
+    LeaderTopicPartition leaderTopicPartition2 = new LeaderTopicPartition(0, SOURCE_TOPICS_VALUE, 1);
+    stubLeaderTopicPartitions.add(leaderTopicPartition2);
 
-        connector.start(sourceProperties);
-        List<Map<String, String>> taskConfigs = connector.taskConfigs(2);
+    PowerMock
+        .expectNew(PartitionMonitor.class, new Class<?>[] { ConnectorContext.class, KafkaSourceConnectorConfig.class },
+            EasyMock.anyObject(ConnectorContext.class), EasyMock.anyObject(KafkaSourceConnectorConfig.class))
+        .andStubReturn(partitionMonitorMock);
 
-        assertEquals(1, taskConfigs.size());
-        assertEquals("0:test.topic:0",
-                taskConfigs.get(0).get("task.leader.topic.partitions"));
-        assertEquals(SOURCE_TOPICS_VALUE,
-                taskConfigs.get(0).get(KafkaSourceConnectorConfig.SOURCE_TOPIC_WHITELIST_CONFIG));
-        assertEquals(SOURCE_BOOTSTRAP_SERVERS_CONFIG,
-                taskConfigs.get(0).get(KafkaSourceConnectorConfig.SOURCE_BOOTSTRAP_SERVERS_CONFIG));
+    partitionMonitorMock.start();
+    PowerMock.expectLastCall().andVoid();
+    EasyMock.expect(partitionMonitorMock.getCurrentLeaderTopicPartitions()).andReturn(stubLeaderTopicPartitions);
+    PowerMock.replayAll();
 
-        verifyAll();
-    }
+    connector.start(sourceProperties);
+    List<Map<String, String>> taskConfigs = connector.taskConfigs(1);
 
-    @Test
-    public void testTaskConfigsReturns1TaskOnTwoTopicPartitions() throws Exception {
-        // Default leader topic partitions to return (just one)
-        stubLeaderTopicPartitions = new HashSet<>();
-        LeaderTopicPartition leaderTopicPartition1 = new LeaderTopicPartition(0, SOURCE_TOPICS_VALUE, 0);
-        stubLeaderTopicPartitions.add(leaderTopicPartition1);
-        LeaderTopicPartition leaderTopicPartition2 = new LeaderTopicPartition(0, SOURCE_TOPICS_VALUE, 1);
-        stubLeaderTopicPartitions.add(leaderTopicPartition2);
+    assertEquals(1, taskConfigs.size());
 
-        PowerMock.expectNew(
-                PartitionMonitor.class,
-                new Class<?>[] {ConnectorContext.class, KafkaSourceConnectorConfig.class},
-                EasyMock.anyObject(ConnectorContext.class),
-                EasyMock.anyObject(KafkaSourceConnectorConfig.class)
-        ).andStubReturn(partitionMonitorMock);
+    PowerMock.verifyAll();
+  }
 
-        partitionMonitorMock.start();
-        PowerMock.expectLastCall().andVoid();
-        EasyMock.expect(partitionMonitorMock.getCurrentLeaderTopicPartitions()).andReturn(stubLeaderTopicPartitions);
-        PowerMock.replayAll();
+  @Test
+  public void testTaskConfigsReturns2TasksOnTwoTopicPartitions() throws Exception {
+    // Default leader topic partitions to return (just one)
+    stubLeaderTopicPartitions = new HashSet<>();
+    LeaderTopicPartition leaderTopicPartition1 = new LeaderTopicPartition(0, SOURCE_TOPICS_VALUE, 0);
+    stubLeaderTopicPartitions.add(leaderTopicPartition1);
+    LeaderTopicPartition leaderTopicPartition2 = new LeaderTopicPartition(0, SOURCE_TOPICS_VALUE, 1);
+    stubLeaderTopicPartitions.add(leaderTopicPartition2);
 
-        connector.start(sourceProperties);
-        List<Map<String, String>> taskConfigs = connector.taskConfigs(1);
+    PowerMock
+        .expectNew(PartitionMonitor.class, new Class<?>[] { ConnectorContext.class, KafkaSourceConnectorConfig.class },
+            EasyMock.anyObject(ConnectorContext.class), EasyMock.anyObject(KafkaSourceConnectorConfig.class))
+        .andStubReturn(partitionMonitorMock);
 
-        assertEquals(1, taskConfigs.size());
+    partitionMonitorMock.start();
+    PowerMock.expectLastCall().andVoid();
+    EasyMock.expect(partitionMonitorMock.getCurrentLeaderTopicPartitions()).andReturn(stubLeaderTopicPartitions);
+    PowerMock.replayAll();
 
-        PowerMock.verifyAll();
-    }
+    connector.start(sourceProperties);
+    List<Map<String, String>> taskConfigs = connector.taskConfigs(2);
 
-    @Test
-    public void testTaskConfigsReturns2TasksOnTwoTopicPartitions() throws Exception {
-        // Default leader topic partitions to return (just one)
-        stubLeaderTopicPartitions = new HashSet<>();
-        LeaderTopicPartition leaderTopicPartition1 = new LeaderTopicPartition(0, SOURCE_TOPICS_VALUE, 0);
-        stubLeaderTopicPartitions.add(leaderTopicPartition1);
-        LeaderTopicPartition leaderTopicPartition2 = new LeaderTopicPartition(0, SOURCE_TOPICS_VALUE, 1);
-        stubLeaderTopicPartitions.add(leaderTopicPartition2);
+    assertEquals(2, taskConfigs.size());
 
-        PowerMock.expectNew(
-                PartitionMonitor.class,
-                new Class<?>[] {ConnectorContext.class, KafkaSourceConnectorConfig.class},
-                EasyMock.anyObject(ConnectorContext.class),
-                EasyMock.anyObject(KafkaSourceConnectorConfig.class)
-        ).andStubReturn(partitionMonitorMock);
+    PowerMock.verifyAll();
+  }
 
-        partitionMonitorMock.start();
-        PowerMock.expectLastCall().andVoid();
-        EasyMock.expect(partitionMonitorMock.getCurrentLeaderTopicPartitions()).andReturn(stubLeaderTopicPartitions);
-        PowerMock.replayAll();
+  @Test
+  public void testTaskClass() {
+    replayAll();
 
-        connector.start(sourceProperties);
-        List<Map<String, String>> taskConfigs = connector.taskConfigs(2);
+    assertEquals(KafkaSourceTask.class, connector.taskClass());
 
-        assertEquals(2, taskConfigs.size());
-
-        PowerMock.verifyAll();
-    }
-
-
-    @Test
-    public void testTaskClass() {
-        replayAll();
-
-        assertEquals(KafkaSourceTask.class, connector.taskClass());
-
-        verifyAll();
-    }
-
+    verifyAll();
+  }
 
 }

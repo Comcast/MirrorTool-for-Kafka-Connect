@@ -1,5 +1,5 @@
 /**
- * Copyright 2018 Comcast Cable Communications Management, LLC
+ * Copyright 2019 Comcast Cable Communications Management, LLC
  * Licensed under the Apache License, Version 2.0 (the "License"); * you may not use this file except in compliance with the License. * You may obtain a copy of the License at
  * http://www.apache.org/licenses/LICENSE-2.0
  * Unless required by applicable law or agreed to in writing, software
@@ -16,9 +16,7 @@ plugins {
     id 'com.github.johnrengelman.shadow' version '2.0.4'
 }
 
-version = '2.0.1'
-
-
+version = '3.0.0'
 
 dependencies {
     def kafkaVersion = '2.0.0'
@@ -27,7 +25,6 @@ dependencies {
     compileOnly group: 'org.apache.kafka', name: 'connect-api', version: kafkaVersion
     compileOnly group: 'org.apache.kafka', name: 'kafka-clients', version: kafkaVersion
     compileOnly group: 'org.slf4j', name: 'slf4j-api', version: slf4jVersion
-    compile group: 'org.slf4j', name: 'slf4j-simple', version: slf4jVersion
 
     // Test
     def junitVersion = '4.12'

@@ -10,14 +10,10 @@
 
 package com.comcast.kafka.connect.kafka;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 public class Version {
-    private static final Logger log = LoggerFactory.getLogger(Version.class);
-    private static String version = Version.class.getPackage().getImplementationVersion();
+  private static String version = Version.class.getPackage().getImplementationVersion();
 
-    public static String version() {
-        return version;
-    }
+  public static String version() {
+    return version;
+  }
 }
