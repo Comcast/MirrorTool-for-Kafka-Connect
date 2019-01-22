@@ -44,7 +44,7 @@ These are the most common options that are required when configuring this connec
 Configuration Parameter | Example | Description
 ----------------------- | ------- | -----------
 **source.bootstrap.servers** | source.broker1:9092,source.broker2:9092 | **Mandatory.** Comma separated list of boostrap servers for the source Kafka cluster
-**source.topic.whitelist** | topic, topic-prefix* | Java regular expression to match topics to mirror. For convenience, comma (',') is interpreted as the regex-choice symbol ('|').
+**source.topic.whitelist** | topic, topic-prefix* | Java regular expression to match topics to mirror. For convenience, comma (',') is interpreted as the regex-choice symbol ('\|').
 **source.auto.offset.reset** | earliest | If there is no stored offset* for a partition, indicates where to start consuming from. Options are _"earliest"_,  _"latest"_, or _"none"_. Default: _earliest_
 **source.group.id** | kafka-connect | Group ID used when writing offsets back to source cluster (for offset lag tracking)
 
