@@ -10,15 +10,18 @@
 
 package com.comcast.kafka.connect.kafka;
 
+import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.clients.consumer.OffsetResetStrategy;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.header.Headers;
 import org.apache.kafka.connect.data.Schema;
+import org.apache.kafka.connect.errors.ConnectException;
 import org.apache.kafka.connect.header.ConnectHeaders;
 import org.apache.kafka.connect.source.SourceTask;
 import org.apache.kafka.connect.source.SourceRecord;
@@ -69,13 +72,13 @@ public class KafkaSourceTask extends SourceTask {
     includeHeaders = sourceConnectorConfig.getBoolean(KafkaSourceConnectorConfig.INCLUDE_MESSAGE_HEADERS_CONFIG);
     String unknownOffsetResetPosition = sourceConnectorConfig
         .getString(KafkaSourceConnectorConfig.CONSUMER_AUTO_OFFSET_RESET_CONFIG);
-    
-        // Get the leader topic partitions to work with
+
+    // Get the leader topic partitions to work with
     List<LeaderTopicPartition> leaderTopicPartitions = Arrays
         .asList(opts.get(KafkaSourceConnectorConfig.TASK_LEADER_TOPIC_PARTITION_CONFIG).split(",")).stream()
         .map(LeaderTopicPartition::fromString).collect(Collectors.toList());
-    
-        // retrieve the existing offsets (if any) for the configured partitions
+
+    // retrieve the existing offsets (if any) for the configured partitions
     List<Map<String, String>> offsetLookupPartitions = leaderTopicPartitions.stream()
         .map(leaderTopicPartition -> Collections.singletonMap(TOPIC_PARTITION_KEY,
             leaderTopicPartition.toTopicPartitionString()))
@@ -87,7 +90,7 @@ public class KafkaSourceTask extends SourceTask {
         .collect(Collectors.toMap(e -> e.getKey().get(TOPIC_PARTITION_KEY), e -> (long) e.getValue().get(OFFSET_KEY)));
     // Set up Kafka consumer
     consumer = new KafkaConsumer<byte[], byte[]>(sourceConnectorConfig.getKafkaConsumerProperties());
-   
+
     // Get topic partitions and offsets so we can seek() to them
     Map<TopicPartition, Long> topicPartitionOffsets = new HashMap<>();
     List<TopicPartition> topicPartitionsWithUnknownOffset = new ArrayList<>();
@@ -101,7 +104,7 @@ public class KafkaSourceTask extends SourceTask {
         topicPartitionsWithUnknownOffset.add(topicPartition);
       }
     }
-    
+
     // Set default offsets for partitions without stored offsets
     if (topicPartitionsWithUnknownOffset.size() > 0) {
       Map<TopicPartition, Long> defaultOffsets;
@@ -115,7 +118,16 @@ public class KafkaSourceTask extends SourceTask {
       } else if (unknownOffsetResetPosition.equals(OffsetResetStrategy.NONE.toString().toLowerCase())) {
         logger.info("Will try to use existing consumer group offsets for partitions.");
         defaultOffsets = topicPartitionsWithUnknownOffset.stream()
-            .collect(Collectors.toMap(Function.identity(), tp -> consumer.committed(tp).offset()));
+            .collect(Collectors.toMap(Function.identity(), tp -> {
+                OffsetAndMetadata committed = consumer.committed(tp);
+                if (committed == null) {
+                    throw new ConnectException(
+                        String.format("Unable to find committed offsets for consumer group for when %s=%s",
+                            ConsumerConfig.AUTO_OFFSET_RESET_CONFIG,
+                            OffsetResetStrategy.NONE.toString().toLowerCase()));
+                }
+                return committed.offset();
+            }));
       } else {
         logger.warn(
             "Config value {}, is set to an unknown value: {}. Partitions without existing offset data will not be consumed.",
@@ -124,11 +136,11 @@ public class KafkaSourceTask extends SourceTask {
       }
       topicPartitionOffsets.putAll(defaultOffsets);
     }
-   
+
     // List of topic partitions to assign
     List<TopicPartition> topicPartitionsToAssign = new ArrayList<>(topicPartitionOffsets.keySet());
     consumer.assign(topicPartitionsToAssign);
-   
+
     // Seek to desired offset for each partition
     topicPartitionOffsets.forEach((key, value) -> consumer.seek(key, value));
   }
