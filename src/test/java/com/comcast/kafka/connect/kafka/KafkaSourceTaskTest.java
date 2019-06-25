@@ -73,7 +73,6 @@ public class KafkaSourceTaskTest {
 
   private KafkaSourceTask objectUnderTest;
   private Map<String, String> opts;
-  private Properties props;
   private KafkaSourceConnectorConfig config;
   private OffsetStorageReader offsetStorageReader;
   private SourceTaskContext context;
@@ -94,8 +93,6 @@ public class KafkaSourceTaskTest {
     opts.put(KafkaSourceConnectorConfig.CONSUMER_GROUP_ID_CONFIG, CONSUMER_GROUP_ID_VALUE);
 
     config = new KafkaSourceConnectorConfig(opts);
-    props = new Properties();
-    props.putAll(config.allWithPrefix(KafkaSourceConnectorConfig.CONSUMER_PREFIX));
 
     objectUnderTest = new KafkaSourceTask();
 
@@ -197,8 +194,6 @@ public class KafkaSourceTaskTest {
   public void testStartNoStoredPartitionsStartBeginning() throws Exception {
     opts.put(KafkaSourceConnectorConfig.CONSUMER_AUTO_OFFSET_RESET_CONFIG, "earliest");
     config = new KafkaSourceConnectorConfig(opts);
-    props = new Properties();
-    props.putAll(config.allWithPrefix(KafkaSourceConnectorConfig.CONSUMER_PREFIX));
 
     TopicPartition firstTopicPartition = new TopicPartition(FIRST_TOPIC, FIRST_PARTITION);
     Collection<TopicPartition> topicPartitions = new ArrayList<>();
@@ -252,8 +247,6 @@ public class KafkaSourceTaskTest {
     opts.put(KafkaSourceConnectorConfig.TASK_LEADER_TOPIC_PARTITION_CONFIG,
         TASK_LEADER_TOPIC_PARTITION_VALUE + "," + "0:" + SECOND_TOPIC + ":" + SECOND_PARTITION);
     config = new KafkaSourceConnectorConfig(opts);
-    props = new Properties();
-    props.putAll(config.allWithPrefix(KafkaSourceConnectorConfig.CONSUMER_PREFIX));
 
     TopicPartition firstTopicPartition = new TopicPartition(FIRST_TOPIC, FIRST_PARTITION);
     TopicPartition secondTopicPartition = new TopicPartition(SECOND_TOPIC, SECOND_PARTITION);
@@ -322,8 +315,6 @@ public class KafkaSourceTaskTest {
   public void testPollRecordReturnedIncludeHeaders() throws Exception {
     opts.put(KafkaSourceConnectorConfig.INCLUDE_MESSAGE_HEADERS_CONFIG, "true");
     config = new KafkaSourceConnectorConfig(opts);
-    props = new Properties();
-    props.putAll(config.allWithPrefix(KafkaSourceConnectorConfig.CONSUMER_PREFIX));
 
     objectUnderTest = new KafkaSourceTask();
     offsetStorageReader = createMock(OffsetStorageReader.class);

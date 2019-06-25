@@ -67,6 +67,7 @@ public class KafkaSourceConnectorTest extends EasyMockSupport {
     sourceProperties.put(KafkaSourceConnectorConfig.TOPIC_LIST_TIMEOUT_MS_CONFIG, TOPIC_LIST_TIMEOUT_MS_VALUE);
     sourceProperties.put(KafkaSourceConnectorConfig.CONSUMER_GROUP_ID_CONFIG, CONSUMER_GROUP_ID_VALUE);
 
+
     // Default leader topic partitions to return (just one)
     stubLeaderTopicPartitions = new HashSet<>();
     LeaderTopicPartition leaderTopicPartition = new LeaderTopicPartition(0, SOURCE_TOPICS_VALUE, 0);

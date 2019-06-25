@@ -80,10 +80,4 @@ public class LeaderTopicPartitionTest {
     assert objectUnderTest1.equals(objectUnderTest2);
   }
 
-  @Test
-  public void testEqualsWithOtherInstance() {
-    String unexpectedString = "NOT_LEADER_TOPIC_PARTITION";
-    assertFalse(objectUnderTest.equals(unexpectedString));
-  }
-
 }
