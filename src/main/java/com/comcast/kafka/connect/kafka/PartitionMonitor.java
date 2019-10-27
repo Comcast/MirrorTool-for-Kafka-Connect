@@ -195,7 +195,13 @@ public class PartitionMonitor {
     logger.debug("Server topic list: {}", retrievedTopicSet);
     Set<String> matchedTopicSet = retrievedTopicSet.stream().filter(topic -> matchedTopicFilter(topic))
         .collect(Collectors.toSet());
-    logger.debug("Matched topic list: {}", matchedTopicSet);
+    if (matchedTopicSet.size() > 0) {
+      logger.debug("Matched topic list: {}", matchedTopicSet);
+    } else {
+      logger.warn("Provided pattern {} does currently not match any topic." +
+                   " Thus connector won't spawn any task until partition monitor recognizes matching topic.", this.topicWhitelistPattern.toString());
+
+    }
 
     DescribeTopicsOptions describeTopicsOptions = new DescribeTopicsOptions()
         .timeoutMs((int) (requestTimeoutMs - (System.currentTimeMillis() - startWait)));
