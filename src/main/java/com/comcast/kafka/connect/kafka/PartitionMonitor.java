@@ -24,6 +24,7 @@ import org.slf4j.LoggerFactory;
 import java.util.Map;
 import java.util.Set;
 import java.util.HashSet;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeoutException;
@@ -45,6 +46,7 @@ public class PartitionMonitor {
   private AdminClient partitionMonitorClient;
   private Pattern topicWhitelistPattern;
   private volatile Set<LeaderTopicPartition> currentLeaderTopicPartitions = new HashSet<>();
+  private final CountDownLatch firstFetch = new CountDownLatch(1);
 
   private int maxShutdownWaitMs;
   private int topicRequestTimeoutMs;
@@ -74,35 +76,35 @@ public class PartitionMonitor {
                 topicRequestTimeoutMs);
             if (logger.isDebugEnabled()) {
               logger.debug("retrievedLeaderTopicPartitions: {}", retrievedLeaderTopicPartitions);
-              logger.debug("currentLeaderTopicPartitions: {}", getCurrentLeaderTopicPartitions());
+              logger.debug("currentLeaderTopicPartitions: {}", currentLeaderTopicPartitions);
             }
             boolean requestTaskReconfiguration = false;
-            if (reconfigureTasksOnLeaderChange) {
-              if (!retrievedLeaderTopicPartitions.equals(getCurrentLeaderTopicPartitions())) {
-                logger.info(
-                    "Retrieved leaders and topic partitions do not match currently stored leaders and topic partitions, will request task reconfiguration");
-                requestTaskReconfiguration = true;
+            if (currentLeaderTopicPartitions != null) {
+              if (reconfigureTasksOnLeaderChange) {
+                if (!retrievedLeaderTopicPartitions.equals(currentLeaderTopicPartitions)) {
+                  logger.info("Retrieved leaders and topic partitions do not match currently stored leaders and topic partitions, will request task reconfiguration");
+                  requestTaskReconfiguration = true;
+                }
+              } else {
+                Set<TopicPartition> retrievedTopicPartitions = retrievedLeaderTopicPartitions.stream().map(LeaderTopicPartition::toTopicPartition).collect(Collectors.toSet());
+                if (logger.isDebugEnabled())
+                  logger.debug("retrievedTopicPartitions: {}", retrievedTopicPartitions);
+                Set<TopicPartition> currentTopicPartitions = currentLeaderTopicPartitions.stream().map(LeaderTopicPartition::toTopicPartition).collect(Collectors.toSet());
+                if (logger.isDebugEnabled())
+                  logger.debug("currentTopicPartitions: {}", currentTopicPartitions);
+                if (!retrievedTopicPartitions.equals(currentTopicPartitions)) {
+                  logger.info("Retrieved topic partitions do not match currently stored topic partitions, will request task reconfiguration");
+                  requestTaskReconfiguration = true;
+                }
               }
+              setCurrentLeaderTopicPartitions(retrievedLeaderTopicPartitions);
+              if (requestTaskReconfiguration)
+                connectorContext.requestTaskReconfiguration();
+              else
+                logger.info("No partition changes which require reconfiguration have been detected.");
             } else {
-              Set<TopicPartition> retrievedTopicPartitions = retrievedLeaderTopicPartitions.stream()
-                  .map(LeaderTopicPartition::toTopicPartition).collect(Collectors.toSet());
-              if (logger.isDebugEnabled())
-                logger.debug("retrievedTopicPartitions: {}", retrievedTopicPartitions);
-              Set<TopicPartition> currentTopicPartitions = getCurrentLeaderTopicPartitions().stream()
-                  .map(LeaderTopicPartition::toTopicPartition).collect(Collectors.toSet());
-              if (logger.isDebugEnabled())
-                logger.debug("currentTopicPartitions: {}", currentTopicPartitions);
-              if (!retrievedTopicPartitions.equals(currentTopicPartitions)) {
-                logger.info(
-                    "Retrieved topic partitions do not match currently stored topic partitions, will request task reconfiguration");
-                requestTaskReconfiguration = true;
-              }
+              setCurrentLeaderTopicPartitions(retrievedLeaderTopicPartitions);
             }
-            setCurrentLeaderTopicPartitions(retrievedLeaderTopicPartitions);
-            if (requestTaskReconfiguration)
-              connectorContext.requestTaskReconfiguration();
-            else
-              logger.info("No partition changes which require reconfiguration have been detected.");
           } catch (TimeoutException e) {
             logger.error(
                 "Timeout while waiting for AdminClient to return topic list. This indicates a (possibly transient) connection issue, or is an indicator that the timeout is set too low. {}",
@@ -130,8 +132,6 @@ public class PartitionMonitor {
       logger.error(
           "Timeout while waiting for AdminClient to return topic list. This likely indicates a (possibly transient) connection issue, but could be an indicator that the timeout is set too low. {}",
           e);
-      throw new ConnectException(
-          "Timeout while waiting for AdminClient to return topic list. This likely indicates a (possibly transient) connection issue, but could be an indicator that the timeout is set too low.");
     } catch (ExecutionException e) {
       logger.error("Unexpected ExecutionException. {}", e);
       throw new ConnectException("Unexpected  while starting PartitionMonitor.");
@@ -149,11 +149,23 @@ public class PartitionMonitor {
     return topicWhitelistPattern.matcher(topic).matches();
   }
 
-  private synchronized void setCurrentLeaderTopicPartitions(Set<LeaderTopicPartition> leaderTopicPartitions) {
+  private void setCurrentLeaderTopicPartitions(Set<LeaderTopicPartition> leaderTopicPartitions) {
     currentLeaderTopicPartitions = leaderTopicPartitions;
+    firstFetch.countDown();
   }
 
-  public synchronized Set<LeaderTopicPartition> getCurrentLeaderTopicPartitions() {
+  public Set<LeaderTopicPartition> getCurrentLeaderTopicPartitions() {
+    if (currentLeaderTopicPartitions == null) {
+      try {
+        firstFetch.await(topicRequestTimeoutMs, TimeUnit.MILLISECONDS);
+      } catch (InterruptedException e) {
+        logger.error("Interrupted while waiting for AdminClient to first return topic list");
+        Thread.currentThread().interrupt();
+      }
+    }
+    if (currentLeaderTopicPartitions == null) {
+      throw new ConnectException("Timeout while waiting for AdminClient to first return topic list");
+    }
     return currentLeaderTopicPartitions;
   }
 
