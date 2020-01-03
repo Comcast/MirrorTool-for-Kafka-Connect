@@ -15,7 +15,7 @@ plugins {
     id 'idea'
 }
 
-version = '3.0.3'
+version = '3.1.0'
 
 dependencies {
     def kafkaVersion = '2.0.0'
