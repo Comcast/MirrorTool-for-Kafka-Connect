@@ -120,28 +120,9 @@ public class PartitionMonitor {
   }
 
   public void start() {
-    // On start, block until we retrieve the initial list of topic partitions (or at
-    // least until timeout)
-    try {
-      // This will block while waiting to retrieve data form kafka. Timeout is set so
-      // that we don't hang the kafka connect herder if an invalid configuration
-      // causes us to retry infinitely.
-      logger.info("Retrieving initial topic list from kafka.");
-      setCurrentLeaderTopicPartitions(retrieveLeaderTopicPartitions(topicRequestTimeoutMs));
-    } catch (TimeoutException e) {
-      logger.error(
-          "Timeout while waiting for AdminClient to return topic list. This likely indicates a (possibly transient) connection issue, but could be an indicator that the timeout is set too low. {}",
-          e);
-    } catch (ExecutionException e) {
-      logger.error("Unexpected ExecutionException. {}", e);
-      throw new ConnectException("Unexpected  while starting PartitionMonitor.");
-    } catch (InterruptedException e) {
-      logger.error("InterruptedException. {}, e");
-      throw new ConnectException("Unexpected InterruptedException while starting PartitionMonitor.");
-    }
     // Schedule a task to periodically run to poll for new data
     pollExecutorService = Executors.newSingleThreadScheduledExecutor();
-    pollHandle = pollExecutorService.scheduleWithFixedDelay(pollThread, topicPollIntervalMs, topicPollIntervalMs,
+    pollHandle = pollExecutorService.scheduleWithFixedDelay(pollThread, 0, topicPollIntervalMs,
         TimeUnit.MILLISECONDS);
   }
 
