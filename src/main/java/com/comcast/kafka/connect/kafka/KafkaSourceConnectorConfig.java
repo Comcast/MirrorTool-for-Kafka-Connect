@@ -24,6 +24,7 @@ import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.HashMap;
 import java.util.Properties;
 import java.util.regex.Pattern;
@@ -35,7 +36,7 @@ public class KafkaSourceConnectorConfig extends AbstractConfig {
     @Override
     @SuppressWarnings("unchecked")
     public void ensureValid(String name, Object value) {
-      if (((List<String>) value).isEmpty()) {
+      if (Objects.isNull(value) || ((List<String>) value).isEmpty()) {
         throw new ConfigException("At least one bootstrap server must be configured in " + name);
       }
     }
@@ -239,8 +240,10 @@ public class KafkaSourceConnectorConfig extends AbstractConfig {
 
   // Returns a java regex pattern that can be used to match kafka topics
   private static Pattern getTopicWhitelistPattern(String rawRegex) {
-    String regex = rawRegex.trim().replace(',', '|').replace(" ", "").replaceAll("^[\"']+", "").replaceAll("[\"']+$",
-        ""); // property files may bring quotes
+    String regex = new String();
+    if (Objects.nonNull(rawRegex)) {
+      regex = rawRegex.trim().replace(',', '|').replace(" ", "").replaceAll("^[\"']+", "").replaceAll("[\"']+$",""); // property files may bring quotes
+    }
     try {
       return Pattern.compile(regex);
     } catch (PatternSyntaxException e) {
