@@ -22,7 +22,7 @@ At Comcast, we have seen two key benefits to using MirrorTool over MirrorMaker:
 * Connector starts up a "Partition Monitor" thread which uses the Kafka AdminClient to get a list of topics (and partitons) from the source cluster to be mirrored to the destination cluster.
 * List of available topic partitions are allocated to the configured number of tasks.
 * Each task starts a KafkaConsumer and assigns its allocated topic partitions to the consumer.
-* As messages are consumed from the source cluster, they are passed to the Kafka Conenct framework to deliver the messages to the destination kafka cluster
+* As messages are consumed from the source cluster, they are passed to the Kafka Connect framework to deliver the messages to the destination kafka cluster
 * The "Partition Monitor" thread periodically checks the source cluster for changes to the topics and partitions that have been configured for the connector, and will trigger a task reconfiguration if required.
 
 ## Build
