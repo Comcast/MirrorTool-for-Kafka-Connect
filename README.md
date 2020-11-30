@@ -1,4 +1,6 @@
-# MirrorTool for Kafka Connect
+# MirrorTool for Kafka Connect (Deprecated)
+
+**Note: Since version [2.4](https://github.com/apache/kafka/tree/2.4/connect/mirror) Kafka ships with a Kafka Source Connector that implements this functionality. As such, this repository is no longer actively maintained.**
 
 A Kafka Source Connector for [Kafka Connect](https://kafka.apache.org/documentation/#connect). Mirror topics from a source Kafka cluster into your destination Kafka cluster.
 
